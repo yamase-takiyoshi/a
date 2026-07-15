@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The競馬 EV分析 v5.18.304 NarHistoryDbOdds</title>
+<title>The競馬 EV分析 v5.18.305 NarHistoryDbOdds</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -662,7 +662,7 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button id="profitSplitBtn" class="btn-sm profit-split-toggle" type="button" onclick="toggleProfitLiveSplit()" aria-pressed="false">📊 横2画面</button>
-    <span class="ver">v5.18.304 NarHistoryDbOdds</span>
+    <span class="ver">v5.18.305 NarHistoryDbOdds</span>
     <span id="narBadge" class="nar-badge" style="display:none">NAR</span>
   </div>
 </div>
@@ -14429,22 +14429,26 @@ if(horses.length === 0){
           for(let i = 0; i < races.length; i++){
             if(rsAbort) break;
             const r = races[i];
+            // JRA日程探索の raceId/raceNo と直接取得の rid/no を吸収。
+            const raceRid = String(r && (r.rid || r.raceId || r.race_id) || '');
+            const raceNo = Number(r && (r.no || r.raceNo || r.race_no) || raceRid.slice(-2));
+            if(!raceRid || !(raceNo >= 1 && raceNo <= 12)) continue;
             // v5.18.203 DirectGraphLink: 精算済み（着順確定でJSON/前回結果に記録済み）は再取得しない
-            if(resume && rsResume.isDone(date, vc, r.no, r.rid)){ rsSkipped++; continue; }
+            if(resume && rsResume.isDone(date, vc, raceNo, raceRid)){ rsSkipped++; continue; }
             if(prog && (!fastMode || i === 0 || ((i + 1) % 4 === 0) || i === races.length - 1)){
-              prog.innerHTML = `<div class="url-status">${fastMode ? '⚡' : '♞'} ${date} ${vn} ${r.no}R を処理中（${i + 1}/${races.length}R）${fastMode ? ' / 描画間引き中' : ''}</div>`;
+              prog.innerHTML = `<div class="url-status">${fastMode ? '⚡' : '♞'} ${date} ${vn} ${raceNo}R を処理中（${i + 1}/${races.length}R）${fastMode ? ' / 描画間引き中' : ''}</div>`;
             }
 
-            const row = { date, venueCode: vc, venueName: vn, no: r.no, rid: r.rid,
-                          raceName: r.name || (r.no + 'R'), status: 'pending',
+            const row = { date, venueCode: vc, venueName: vn, no: raceNo, rid: raceRid,
+                          raceName: r.name || r.raceName || (raceNo + 'R'), status: 'pending',
                           count: 0, bet: 0, ret: 0, profit: 0, roi: 0, hit: 0, hasFinish: false, finishTop: [] };
             try{
               const loaded = (fastMode && String(date) < todayForFast)
-                ? await asw_loadHorsesFast(kind, r.rid)
-                : await asw_loadHorses(kind, r.rid);
+                ? await asw_loadHorsesFast(kind, raceRid)
+                : await asw_loadHorses(kind, raceRid);
               horses = loaded.horses;
-              currentRaceId = r.rid;
-              currentRaceName = loaded.raceName || r.name || (r.no + 'R');
+              currentRaceId = raceRid;
+              currentRaceName = loaded.raceName || r.name || r.raceName || (raceNo + 'R');
               row.raceName = currentRaceName;
 
               const valid = horses.filter(h => Number(h.num) > 0 && h.name);
@@ -14456,7 +14460,7 @@ if(horses.length === 0){
               simTickets = lastTickets.map(t => ({ ...t, nums: [...t.nums] }));
               row.count = lastTickets.length;
 
-              const { finish, payouts } = await asw_getResult(kind, r.rid, loaded.resultDoc);
+              const { finish, payouts } = await asw_getResult(kind, raceRid, loaded.resultDoc);
               row.hasFinish = finish && finish.length >= 2;
               row.finishTop = row.hasFinish ? finish.slice(0, 3).map(x => x.horseNo) : [];
 
@@ -14742,7 +14746,13 @@ if(horses.length === 0){
         }else{
           try{ races = await rsCollectRaces(kind, date, vc); }catch(e){ races = []; }
         }
-        races.forEach(r => tasks.push({date, venueCode:vc, venueName:vn, no:r.no, rid:r.rid, raceName:r.name || (r.no + 'R')}));
+        races.forEach(r => {
+          // JRA日程探索は raceId/raceNo、直接取得は rid/no を返すため両形式を統一。
+          const rid = String(r && (r.rid || r.raceId || r.race_id) || '');
+          const no = Number(r && (r.no || r.raceNo || r.race_no) || rid.slice(-2));
+          if(!rid || !(no >= 1 && no <= 12)) return;
+          tasks.push({date, venueCode:vc, venueName:vn, no, rid, raceName:r.name || r.raceName || (no + 'R')});
+        });
       }
     }
     return tasks;
@@ -23449,7 +23459,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
    ============================================================ */
 (function(){
   'use strict';
-  var VERSION = 'v5.18.304 NarHistoryDbOdds';
+  var VERSION = 'v5.18.305 NarHistoryDbOdds';
   var KEY = 'tk-sim-reservations-v1';
   var IMMEDIATE_KEY = 'tk-sweep-immediate-all-v1';
   var GUARD_KEY = 'tk-sweep-purchase-guard-v1';
@@ -26084,7 +26094,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.304 NarHistoryDbOdds: 全て同意でも3点すべての旨み判定を維持 */
+/* v5.18.305 NarHistoryDbOdds: 全て同意でも3点すべての旨み判定を維持 */
 (function(){
   'use strict';
   function n(v){var x=Number(v);return Number.isFinite(x)?x:0}
@@ -26214,7 +26224,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.287 BatchSubmitAssist: 3点セット当日一括購入票＋公式投票サイト引き渡し */
 (function(){
   'use strict';
-  var VERSION='v5.18.304 NarHistoryDbOdds';
+  var VERSION='v5.18.305 NarHistoryDbOdds';
   var RES_KEY='tk-sim-reservations-v1';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var PREF_KEY='tk-daily-batch-provider-v1';
@@ -26389,7 +26399,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.256 RangeSyncFix: 横2画面リアルタイム連動 */
 (function(){
   'use strict';
-  var V='v5.18.304 NarHistoryDbOdds';
+  var V='v5.18.305 NarHistoryDbOdds';
   function applyVersion(){
     window.APP_VERSION=V;
     var el=document.querySelector('.header .ver, .ver');
@@ -27205,10 +27215,10 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.304 NarHistoryDbOdds: 最終通信・買い目・比較表示経路を固定 */
+/* v5.18.305 NarHistoryDbOdds: 最終通信・買い目・比較表示経路を固定 */
 (function(){
   'use strict';
-  var VERSION='v5.18.304 NarHistoryDbOdds';
+  var VERSION='v5.18.305 NarHistoryDbOdds';
   function ridFromUrl(url){
     var s=String(url||'');
     if(!/^https:\/\/nar(?:\.sp)?\.netkeiba\.com\//i.test(s))return '';
@@ -27274,12 +27284,12 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.304 NarHistoryDbOdds: 全て同意は旨み条件を保ったユーザー強制優先層 */
+/* v5.18.305 NarHistoryDbOdds: 全て同意は旨み条件を保ったユーザー強制優先層 */
 (function(){
   'use strict';
   var MODE_KEY='all_agree';
   var MODE_LABEL='🤝 全て同意（ユーザー強制優先）';
-  var VERSION='v5.18.304 NarHistoryDbOdds';
+  var VERSION='v5.18.305 NarHistoryDbOdds';
   var SETTINGS_KEY='tk-html-settings';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var DEFAULT_BASE_MODE='roi100';
@@ -27539,7 +27549,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 // ============================================================
 (function(){
   'use strict';
-  const V274 = 'v5.18.304 NarHistoryDbOdds';
+  const V274 = 'v5.18.305 NarHistoryDbOdds';
   const LS_MODE = 'narGoMode_v1';
   const TTL_MS = 30000;
   const OFFICIAL_ODDS_FROM274 = '20260301';
