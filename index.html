@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The競馬 EV分析 v5.18.300 ResultConfirmStrict</title>
+<title>The競馬 EV分析 v5.18.301 RaceIdOfficialZero</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -662,7 +662,7 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button id="profitSplitBtn" class="btn-sm profit-split-toggle" type="button" onclick="toggleProfitLiveSplit()" aria-pressed="false">📊 横2画面</button>
-    <span class="ver">v5.18.300 ResultConfirmStrict</span>
+    <span class="ver">v5.18.301 RaceIdOfficialZero</span>
     <span id="narBadge" class="nar-badge" style="display:none">NAR</span>
   </div>
 </div>
@@ -3312,9 +3312,9 @@ function renderHorseRows(){
   horses.forEach((h, i) => {
     const row = document.createElement('div');
     row.className = 'horse-row';
-    // v5.18.300: 人気は公開済みだが単勝0.0の馬は、取得失敗と区別して「未投票」と表示。
+    // v5.18.301: race_id公式照会で単勝0.0だった馬は、取得失敗と区別して「未投票」と表示。
     // 計算値は0のままなのでEV計算には混入しない。
-    const oddsPlaceholder = !(Number(h.odds) >= 1) && Number(h.pop) >= 1 ? '未投票' : '倍';
+    const oddsPlaceholder = !(Number(h.odds) >= 1) && (h.officialZeroOdds || Number(h.pop) >= 1) ? '未投票' : '倍';
     row.innerHTML = `
       <input class="frame-in" type="number" value="${h.frame || ''}" min="1" max="8" placeholder="枠"
         onchange="horses[${i}].frame=Number(this.value)">
@@ -3323,7 +3323,7 @@ function renderHorseRows(){
       <input type="text" value="${h.name || ''}" placeholder="馬名"
         onchange="horses[${i}].name=this.value">
       <input class="odds-in" type="number" value="${h.odds || ''}" step="0.1" min="1" placeholder="${oddsPlaceholder}"
-        onchange="horses[${i}].odds=Number(this.value)">
+        onchange="horses[${i}].odds=Number(this.value);if(Number(this.value)>=1)horses[${i}].officialZeroOdds=false">
       <input class="pop-in" type="number" value="${h.pop || ''}" min="1" max="30" placeholder="人気"
         onchange="horses[${i}].pop=Number(this.value);checkPopDuplicate()">
       <button class="del-btn" onclick="removeHorse(${i})">✕</button>
@@ -8597,7 +8597,8 @@ function mergeOddsPopularityIntoHorses(baseHorses, oddsMap){
     return {
       ...h,
       odds: (Number(o.odds) >= 1) ? Number(o.odds) : Number(h.odds || 0),
-      pop: (Number(o.pop) >= 1) ? Number(o.pop) : Number(h.pop || 0)
+      pop: (Number(o.pop) >= 1) ? Number(o.pop) : Number(h.pop || 0),
+      officialZeroOdds: Number(o.odds) >= 1 ? false : !!h.officialZeroOdds
     };
   });
 }
@@ -8999,7 +9000,7 @@ async function fetchRace(){
       .map(h => Number(h.num))
       .filter(n => n >= 1 && n <= 18);
     const officialZeroOddsNums = horses
-      .filter(h => !(Number(h.odds) >= 1) && Number(h.pop) >= 1)
+      .filter(h => !(Number(h.odds) >= 1) && (h.officialZeroOdds || Number(h.pop) >= 1))
       .map(h => Number(h.num))
       .filter(n => n >= 1 && n <= 18);
     const unknownOddsNums = missingOddsNums.filter(n => !officialZeroOddsNums.includes(n));
@@ -9016,10 +9017,13 @@ async function fetchRace(){
     const pageNote = isResultPage
       ? ' / result.html最終値'
       : (/\/race\/result\.html/i.test(activeUrl) ? ' / 結果未確定' : '');
+    const raceIdSourceNote = kind === 'NAR' && window.__fetchPath === 'keiba.go.jp'
+      ? ' / race_id公式照会'
+      : '';
     if(oddsMisKeyed){
       status.innerHTML = `<div class="url-status err">⚠️ 単勝オッズが「馬番=人気=オッズ昇順」と完全一致しました（取得元の人気順テーブルを馬番にそのまま割り当てた誤キーの疑い）。本物の値ではないため、汚染防止にオッズ・人気を破棄しました。<br>馬名・枠・馬番（${horses.length}頭）は取得済みです。時間をおいて再取得するか、各馬のオッズ/人気を手入力してください。</div>`;
     }else{
-      status.innerHTML = `<div class="url-status${waitingOfficialOdds ? '' : ' ok'}">✅ ${escapeHtml(currentRaceName || '')} ${horses.length}頭 取得しました${pageNote} / 単勝オッズ ${oddsCount}件 / 人気 ${popCount}件 / 枠番 ${frameCount}件${oddsNote}${partialOddsNote}</div>`;
+      status.innerHTML = `<div class="url-status${waitingOfficialOdds ? '' : ' ok'}">✅ ${escapeHtml(currentRaceName || '')} ${horses.length}頭 取得しました${raceIdSourceNote}${pageNote} / 単勝オッズ ${oddsCount}件 / 人気 ${popCount}件 / 枠番 ${frameCount}件${oddsNote}${partialOddsNote}</div>`;
     }
 
     // v5.18.244: 取得成功時にD1へ自動同期
@@ -9522,6 +9526,13 @@ function parseHorsesFromDoc(doc, url){
       pop  = extractPopularityFromRow(tr, num);
     }
 
+    // v5.18.301: race_idから照会した地方競馬公式HTMLは、未投票馬を
+    // data-official-zero="1" として保持する。実netkeiba行の明示的な0.0も同様に扱う。
+    const zeroMarker = tr.querySelector('[data-official-zero="1"]');
+    const zeroOddsCell = tr.querySelector('td.Odds, td[class*="Odds"], td[class*="odds"]');
+    const zeroOddsText = toHalfNumberText(normCellText(zeroOddsCell)).replace(/[倍\s,]/g,'');
+    const officialZeroOdds = !!zeroMarker || /^0(?:\.0+)?$/.test(zeroOddsText);
+
     seen.add(num);
 
     list.push({
@@ -9529,7 +9540,8 @@ function parseHorsesFromDoc(doc, url){
       name: horseName,
       odds,
       pop,
-      frame
+      frame,
+      officialZeroOdds
     });
 
   });
@@ -23162,7 +23174,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
    ============================================================ */
 (function(){
   'use strict';
-  var VERSION = 'v5.18.300 ResultConfirmStrict';
+  var VERSION = 'v5.18.301 RaceIdOfficialZero';
   var KEY = 'tk-sim-reservations-v1';
   var IMMEDIATE_KEY = 'tk-sweep-immediate-all-v1';
   var GUARD_KEY = 'tk-sweep-purchase-guard-v1';
@@ -25797,7 +25809,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.300 ResultConfirmStrict: 全て同意でも3点すべての旨み判定を維持 */
+/* v5.18.301 RaceIdOfficialZero: 全て同意でも3点すべての旨み判定を維持 */
 (function(){
   'use strict';
   function n(v){var x=Number(v);return Number.isFinite(x)?x:0}
@@ -25927,7 +25939,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.287 BatchSubmitAssist: 3点セット当日一括購入票＋公式投票サイト引き渡し */
 (function(){
   'use strict';
-  var VERSION='v5.18.300 ResultConfirmStrict';
+  var VERSION='v5.18.301 RaceIdOfficialZero';
   var RES_KEY='tk-sim-reservations-v1';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var PREF_KEY='tk-daily-batch-provider-v1';
@@ -26102,7 +26114,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.256 RangeSyncFix: 横2画面リアルタイム連動 */
 (function(){
   'use strict';
-  var V='v5.18.300 ResultConfirmStrict';
+  var V='v5.18.301 RaceIdOfficialZero';
   function applyVersion(){
     window.APP_VERSION=V;
     var el=document.querySelector('.header .ver, .ver');
@@ -26918,10 +26930,10 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.300 ResultConfirmStrict: 最終通信・買い目・比較表示経路を固定 */
+/* v5.18.301 RaceIdOfficialZero: 最終通信・買い目・比較表示経路を固定 */
 (function(){
   'use strict';
-  var VERSION='v5.18.300 ResultConfirmStrict';
+  var VERSION='v5.18.301 RaceIdOfficialZero';
   function ridFromUrl(url){
     var s=String(url||'');
     if(!/^https:\/\/nar(?:\.sp)?\.netkeiba\.com\//i.test(s))return '';
@@ -26987,12 +26999,12 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.300 ResultConfirmStrict: 全て同意は旨み条件を保ったユーザー強制優先層 */
+/* v5.18.301 RaceIdOfficialZero: 全て同意は旨み条件を保ったユーザー強制優先層 */
 (function(){
   'use strict';
   var MODE_KEY='all_agree';
   var MODE_LABEL='🤝 全て同意（ユーザー強制優先）';
-  var VERSION='v5.18.300 ResultConfirmStrict';
+  var VERSION='v5.18.301 RaceIdOfficialZero';
   var SETTINGS_KEY='tk-html-settings';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var DEFAULT_BASE_MODE='roi100';
@@ -27460,7 +27472,15 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
         if(m){
           const v = Number(m[1]);
           // 斤量(50〜60の整数)は上の正規表現で弾かれるが、念のため下限も見る
-          if(v >= 1 && v <= 9999){ map.set(num, { odds: Math.round(v * 10) / 10, pop: 0 }); }
+          // v5.18.301: 公式0.0は「行欠落」ではなく未投票という有効な状態。
+          // 値はEV計算へ入れず、状態フラグだけ後段まで保持する。
+          if(v >= 0 && v <= 9999){
+            map.set(num, {
+              odds: v >= 1 ? Math.round(v * 10) / 10 : 0,
+              pop: 0,
+              officialZero: v === 0
+            });
+          }
           break;
         }
       }
@@ -27486,7 +27506,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
         <td class="Waku Waku${h.frame || ''}"><span>${h.frame || ''}</span></td>
         <td class="Umaban Umaban${h.frame || ''}">${h.num}</td>
         <td class="HorseInfo"><span class="HorseName"><a href="https://db.netkeiba.com/horse/${info.date}${String(h.num).padStart(2,'0')}/">${esc274(h.name)}</a></span></td>
-        <td class="Odds Txt_R"><span class="OddsVal">${Number(h.odds) >= 1 ? Number(h.odds).toFixed(1) : '--.-'}</span></td>
+        <td class="Odds Txt_R"${h.officialZeroOdds ? ' data-official-zero="1"' : ''}><span class="OddsVal">${Number(h.odds) >= 1 ? Number(h.odds).toFixed(1) : (h.officialZeroOdds ? '0.0' : '--.-')}</span></td>
         <td class="Popular Txt_C"><span class="OddsPeople">${Number(h.pop) >= 1 ? h.pop : ''}</span></td>
       </tr>`).join('');
 
@@ -27536,15 +27556,28 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
       if(!oh) continue;
       const m = parseOdds274(oh, data.horses);
       if(m.size > oddsMap.size) oddsMap = m;
-      if(oddsMap.size >= data.horses.length - 1) break;
+      if(oddsMap.size >= data.horses.length) break;
     }
-    data.horses.forEach(h => { const o = oddsMap.get(h.num); if(o && Number(o.odds) >= 1) h.odds = Number(o.odds); });
+    data.horses.forEach(h => {
+      const o = oddsMap.get(h.num);
+      if(!o) return;
+      if(Number(o.odds) >= 1){
+        h.odds = Number(o.odds);
+        h.officialZeroOdds = false;
+      }else if(o.officialZero){
+        h.odds = 0;
+        h.officialZeroOdds = true;
+      }
+    });
     rankPop274(data.horses);
+
+    const validOddsCount = data.horses.filter(h => Number(h.odds) >= 1).length;
+    const officialZeroCount = data.horses.filter(h => h.officialZeroOdds).length;
 
     const html = buildHtml274(info, data);
     cache274.set(info.rid, { html, ts: now });
-    window.__narGoLast = { rid:info.rid, horses:data.horses.length, odds:oddsMap.size, at:now, err:'' };
-    console.log('[narGo]', info.rid, `${data.horses.length}頭 / オッズ${oddsMap.size}件`, data.raceName);
+    window.__narGoLast = { rid:info.rid, horses:data.horses.length, odds:validOddsCount, officialZero:officialZeroCount, at:now, err:'' };
+    console.log('[narGo]', info.rid, `${data.horses.length}頭 / 有効オッズ${validOddsCount}件 / 公式0.0 ${officialZeroCount}件`, data.raceName);
     return html;
   }
 
