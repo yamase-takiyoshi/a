@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The競馬 EV分析 v5.18.297 NoForceFill</title>
+<title>The競馬 EV分析 v5.18.298 NarOddsStateFix</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -662,7 +662,7 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button id="profitSplitBtn" class="btn-sm profit-split-toggle" type="button" onclick="toggleProfitLiveSplit()" aria-pressed="false">📊 横2画面</button>
-    <span class="ver">v5.18.297 NoForceFill</span>
+    <span class="ver">v5.18.298 NarOddsStateFix</span>
     <span id="narBadge" class="nar-badge" style="display:none">NAR</span>
   </div>
 </div>
@@ -7523,7 +7523,12 @@ function buildNetkeibaOddsUrls(kind, raceId){
       `https://nar.netkeiba.com/race/result.html?race_id=${raceId}&rf=race_submenu`,
       `https://nar.netkeiba.com/odds/index.html?race_id=${raceId}`,
       `https://nar.netkeiba.com/odds/index.html?race_id=${raceId}&type=b1`,
-      `https://nar.netkeiba.com/race/shutuba.html?race_id=${raceId}&rf=race_submenu`
+      // v5.18.298: PC版がJS描画・空HTMLでも、同じrace_idのSP版から
+      // 発売中の単勝オッズ・人気を取得できるよう明示的に試す。
+      `https://nar.sp.netkeiba.com/odds/index.html?race_id=${raceId}`,
+      `https://nar.sp.netkeiba.com/odds/index.html?race_id=${raceId}&type=b1`,
+      `https://nar.netkeiba.com/race/shutuba.html?race_id=${raceId}&rf=race_submenu`,
+      `https://nar.sp.netkeiba.com/race/shutuba.html?race_id=${raceId}`
     ];
   }
   return [
@@ -8768,6 +8773,33 @@ async function fetchRace(){
     const parser = new DOMParser();
     let doc = parser.parseFromString(html, 'text/html');
 
+    // v5.18.298: 発走前でも result.html は出走馬HTMLを返すことがある。
+    // URLだけで最終結果扱いせず、1着・2着が実在しない result.html は
+    // 同じrace_idの出馬表へ戻して発売中オッズの取得経路を使う。
+    if(/\/race\/result\.html/i.test(activeUrl) && !isRaceResultConfirmedDoc(doc)){
+      const liveRid = (activeUrl.match(/race_id=(\d{10,14})/) || [])[1] || validation.raceId || '';
+      const liveKind = document.getElementById('pickKind')?.value || (activeUrl.includes('nar.netkeiba') ? 'NAR' : 'JRA');
+      const liveHost = liveKind === 'NAR' ? 'https://nar.netkeiba.com' : 'https://race.netkeiba.com';
+      if(liveRid){
+        const liveUrl = `${liveHost}/race/shutuba.html?race_id=${liveRid}&rf=race_submenu`;
+        try{
+          status.innerHTML = `<div class="url-status">🕒 結果未確定のため、出馬表と発売中オッズへ切替中...</div>`;
+          const liveHtml = await fetchHtmlViaProxy(liveUrl);
+          const liveDoc = parser.parseFromString(liveHtml, 'text/html');
+          const liveHorses = parseHorsesFromDoc(liveDoc, liveUrl);
+          if(liveHorses.length >= 2){
+            activeUrl = liveUrl;
+            html = liveHtml;
+            doc = liveDoc;
+            document.getElementById('raceUrl').value = liveUrl;
+          }
+        }catch(e){
+          // 出馬表がまだ未公開/一時取得失敗でも、result.htmlを最終値とは扱わず後段で未確定表示にする。
+          console.log('unconfirmed result -> shutuba fallback skipped:', e?.message || e);
+        }
+      }
+    }
+
     // v5.18.60: 確定済みレースは、入力欄がshutuba.htmlのままでもresult.htmlを本体として反映する。
     // オークス等の確定レースは結果ページの最終単勝オッズ・最終人気をそのまま表示する。
     const ridAuto = (activeUrl.match(/race_id=(\d{10,14})/) || [])[1] || validation.raceId || '';
@@ -8780,7 +8812,7 @@ async function fetchRace(){
         const resultDoc = parser.parseFromString(resultHtml, 'text/html');
         const resultHorsesProbe = parseHorsesFromDoc(resultDoc, resultUrl);
         const resultOddsProbe = parseFinalOddsPopularityFromResultDoc(resultDoc, resultHorsesProbe);
-        if(resultHorsesProbe.length >= 2 && resultOddsProbe.size >= 2){
+        if(isRaceResultConfirmedDoc(resultDoc) && resultHorsesProbe.length >= 2 && resultOddsProbe.size >= 2){
           activeUrl = resultUrl;
           html = resultHtml;
           doc = resultDoc;
@@ -8855,7 +8887,8 @@ async function fetchRace(){
     // 出馬表HTMLからのオッズ解析は「予想オッズ列が明示されている場合」のみ保険で使う。
     // NAR側の挙動はそのまま維持し、一切変更しない。
     const kind = document.getElementById('pickKind')?.value || (activeUrl.includes('nar.netkeiba') ? 'NAR' : 'JRA');
-    const isResultPage = /\/race\/result\.html/i.test(activeUrl);
+    // result.htmlというURLだけでは確定扱いにしない。実着順1・2着が取れた場合だけ最終値を採用する。
+    const isResultPage = /\/race\/result\.html/i.test(activeUrl) && isRaceResultConfirmedDoc(doc);
 
     if(rid){
       if(kind === 'JRA'){
@@ -8921,12 +8954,17 @@ async function fetchRace(){
     const popCount = horses.filter(h => Number(h.pop) >= 1).length;
     const provisionalCount = horses.filter(h => h.provisionalOdds).length;
     const frameCount = horses.filter(h => Number(h.frame) >= 1 && Number(h.frame) <= 8).length;
-    const oddsNote = provisionalCount > 0 ? ` / ※${provisionalCount}件は未取得のため予想用暫定値` : '';
-    const pageNote = /\/race\/result\.html/i.test(activeUrl) ? ' / result.html最終値' : '';
+    const waitingOfficialOdds = !isResultPage && oddsCount === 0 && popCount === 0;
+    const oddsNote = provisionalCount > 0
+      ? ` / ※${provisionalCount}件は未取得のため予想用暫定値`
+      : (waitingOfficialOdds ? ' / 単勝オッズ・人気は発売前または未取得（枠番から補完しません）' : '');
+    const pageNote = isResultPage
+      ? ' / result.html最終値'
+      : (/\/race\/result\.html/i.test(activeUrl) ? ' / 結果未確定' : '');
     if(oddsMisKeyed){
       status.innerHTML = `<div class="url-status err">⚠️ 単勝オッズが「馬番=人気=オッズ昇順」と完全一致しました（取得元の人気順テーブルを馬番にそのまま割り当てた誤キーの疑い）。本物の値ではないため、汚染防止にオッズ・人気を破棄しました。<br>馬名・枠・馬番（${horses.length}頭）は取得済みです。時間をおいて再取得するか、各馬のオッズ/人気を手入力してください。</div>`;
     }else{
-      status.innerHTML = `<div class="url-status ok">✅ ${escapeHtml(currentRaceName || '')} ${horses.length}頭 取得しました${pageNote} / 単勝オッズ ${oddsCount}件 / 人気 ${popCount}件 / 枠番 ${frameCount}件${oddsNote}</div>`;
+      status.innerHTML = `<div class="url-status${waitingOfficialOdds ? '' : ' ok'}">✅ ${escapeHtml(currentRaceName || '')} ${horses.length}頭 取得しました${pageNote} / 単勝オッズ ${oddsCount}件 / 人気 ${popCount}件 / 枠番 ${frameCount}件${oddsNote}</div>`;
     }
 
     // v5.18.244: 取得成功時にD1へ自動同期
@@ -9095,11 +9133,14 @@ function isPureDecimalText(t){
 
 function findPopularityIndexByRightScan(tr, horseNo){
   const cells = cellTextsOfRow(tr);
-  // 右端側の「1〜18だけ」のセルを人気として採用。
-  // 馬番や枠番は左側にあるため、右から見ることで誤読を避ける。
+  // v5.18.298: 「n人気」と明記されたセルだけを保険採用する。
+  // 純粋な整数を右から拾う旧処理は、人気未発表のNAR行で枠番を人気に誤認した。
+  // 例: 6番馬の5枠→5番人気、7・8番馬の6枠→6番人気。
+  // ヘッダー/Popular/Ninki class は extractPopularityFromRow() の前段で処理済みなので、
+  // ここでは意味が明示されていない整数を絶対に人気へ流用しない。
   for(let i=cells.length-1; i>=0; i--){
     const tx = cells[i];
-    const m = tx.match(/^(\d{1,2})\s*人気$/) || tx.match(/^(\d{1,2})$/);
+    const m = tx.match(/^(\d{1,2})\s*人気$/);
     if(!m) continue;
     const v = Number(m[1]);
     if(v >= 1 && v <= 18 && v !== Number(horseNo)){
@@ -9231,14 +9272,77 @@ function extractFrameFromRow(tr, horseNo){
   return Math.min(8, Math.max(1, Math.ceil(Number(horseNo || 1) / 2)));
 }
 
+// v5.18.298: URLが result.html であることと、結果確定済みであることを分離する。
+// 発走前でも result.html 自体はHTMLを返すため、URLだけで「最終値」と判定してはいけない。
+// 実際の結果表から1着・2着の両方を取得できた場合だけ確定済みとする。
+function isRaceResultConfirmedDoc(doc){
+  if(!doc) return false;
+  // 着順ヘッダーを持つ「同一の馬結果表」内だけを見る。
+  // ページ全体の数字や予想順位表を横断すると発走前ページを確定扱いし得るため禁止する。
+  try{
+    const tables = Array.from(doc.querySelectorAll('table'));
+    for(const table of tables){
+      const headerRow = Array.from(table.querySelectorAll('tr')).find(r =>
+        Array.from(r.querySelectorAll('th,td')).some(c => /^着\s*順$/.test(normCellText(c).replace(/\s+/g,'')))
+      );
+      if(!headerRow) continue;
+      const headers = Array.from(headerRow.children).map(c => normCellText(c).replace(/\s+/g,''));
+      const rankIndex = headers.findIndex(t => /^着順$/.test(t));
+      if(rankIndex < 0) continue;
+      const ranks = new Set();
+      Array.from(table.querySelectorAll('tr')).forEach(tr => {
+        if(!tr.querySelector('a[href*="/horse/"]')) return;
+        const cells = Array.from(tr.children);
+        const t = toHalfNumberText(normCellText(cells[rankIndex])).trim();
+        const m = t.match(/^([1-9]|1[0-8])(?:着)?$/);
+        if(m) ranks.add(Number(m[1]));
+      });
+      if(ranks.has(1) && ranks.has(2)) return true;
+    }
+  }catch(e){}
+
+  // SP版などヘッダーが省略される場合は、結果表と判別できるclassを持つ表だけを保険走査。
+  try{
+    const tables = Array.from(doc.querySelectorAll(
+      'table.RaceTable01, table.race_table_01, table[class*="Result"], table[class*="result"]'
+    ));
+    for(const table of tables){
+      const ranks = new Set();
+      const horseNums = new Set();
+      Array.from(table.querySelectorAll('tr')).forEach(tr => {
+        const a = tr.querySelector('a[href*="/horse/"]');
+        if(!a) return;
+        const cells = Array.from(tr.querySelectorAll('td,th'));
+        if(cells.length < 4) return;
+        const rankText = toHalfNumberText(normCellText(cells[0])).trim();
+        const rankMatch = rankText.match(/^([1-9]|1[0-8])(?:着)?$/);
+        if(!rankMatch) return;
+        let num = firstNumberInCell(tr.querySelector('.Umaban, [class*="Umaban"], [class*="HorseNum"]'), false);
+        if(!(num >= 1 && num <= 18)){
+          const horseCellIndex = cells.findIndex(c => c.contains(a));
+          for(let i=horseCellIndex-1; i>=0; i--){
+            const t = toHalfNumberText(normCellText(cells[i])).trim();
+            if(/^([1-9]|1[0-8])$/.test(t)){ num = Number(t); break; }
+          }
+        }
+        if(!(num >= 1 && num <= 18)) return;
+        ranks.add(Number(rankMatch[1]));
+        horseNums.add(num);
+      });
+      if(ranks.has(1) && ranks.has(2) && horseNums.size >= 2) return true;
+    }
+  }catch(e){}
+  return false;
+}
+
 function parseHorsesFromDoc(doc, url){
 
   const list = [];
   const seen = new Set();
 
-  // v5.18.59: ページ種別をURLで厳密判定。
-  // shutuba.html はJRAの単勝オッズがJS動的描画なので0初期化。
-  // result.html は確定オッズ・確定人気が静的DOMにあるため、ここで読めるだけ読む。
+  // v5.18.298: ページ種別をURLで厳密判定。
+  // shutuba.html(JRA)とresult.htmlはここではオッズ・人気を0初期化し、
+  // 後段の専用パーサ/oddsページだけから正確な値を馬番JOINする。
   const pageUrl = String(url || '');
   const isResultUrl = /\/race\/result\.html/i.test(pageUrl);
   const isJraShutubaUrl = /race\.netkeiba\.com/.test(pageUrl) && !/nar\.netkeiba/.test(pageUrl) && /\/race\/shutuba\.html/i.test(pageUrl);
@@ -9305,12 +9409,12 @@ function parseHorsesFromDoc(doc, url){
 
     const frame = extractFrameFromRow(tr, num);
 
-    // JRA出馬表HTML（shutuba.html）ではオッズをJSで動的描画するため、
-    // 静的DOMには td.Odds / span.OddsVal が存在せず、斤量列しか残らない。
-    // isJraShutubaUrl=true のときはオッズ・人気を0で初期化し、
-    // 後続の fetchWinOddsPopularity(odds/index.html) で正確な値を上書きする。
+    // JRA出馬表HTML（shutuba.html）はJS動的描画のため0初期化。
+    // v5.18.298: result.htmlもここではオッズ・人気を読まない。
+    // 結果未確定時の枠番・着順・馬番誤読を防ぎ、確定値は後段の
+    // parseFinalOddsPopularityFromResultDoc() / oddsページだけから馬番JOINする。
     let odds, pop;
-    if(isJraShutubaUrl){
+    if(isJraShutubaUrl || isResultUrl){
       odds = 0;
       pop  = 0;
     }else{
@@ -12555,7 +12659,7 @@ if(horses.length === 0){
       html = await fetchHtmlViaProxy(activeUrl);
     }
     let doc = parser.parseFromString(html, 'text/html');
-    let isResultPage = /\/race\/result\.html/i.test(activeUrl);
+    let isResultPage = /\/race\/result\.html/i.test(activeUrl) && isRaceResultConfirmedDoc(doc);
     let resultDoc = isResultPage ? doc : null;
 
     // 出馬表のままでも確定済みなら結果ページの最終値を本体にする（fetchRace と同じ判断）
@@ -12566,8 +12670,9 @@ if(horses.length === 0){
         const rDoc = parser.parseFromString(rHtml, 'text/html');
         const rHorses = parseHorsesFromDoc(rDoc, rUrl);
         const rOdds = parseFinalOddsPopularityFromResultDoc(rDoc, rHorses);
-        resultDoc = rDoc; // 精算で使い回す
-        if(rHorses.length >= 2 && rOdds.size >= 2){
+        const rConfirmed = isRaceResultConfirmedDoc(rDoc);
+        if(rConfirmed) resultDoc = rDoc; // 確定結果だけを精算で使い回す
+        if(rConfirmed && rHorses.length >= 2 && rOdds.size >= 2){
           activeUrl = rUrl; html = rHtml; doc = rDoc; isResultPage = true;
         }
       }catch(e){ /* 未確定レースは結果なし */ }
@@ -12632,6 +12737,7 @@ if(horses.length === 0){
       const url = `${host}/race/result.html?race_id=${rid}&rf=race_submenu`;
       const html = await fetchHtmlViaProxy(url);
       const doc = new DOMParser().parseFromString(html, 'text/html');
+      if(!isRaceResultConfirmedDoc(doc)) throw new Error('result page is not confirmed');
       let hs = parseHorsesFromDoc(doc, url);
       if(!hs || hs.length < 2) throw new Error('result page horses not enough');
       const raceName = parseRaceTitleFromDoc(doc) || '';
@@ -22956,7 +23062,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
    ============================================================ */
 (function(){
   'use strict';
-  var VERSION = 'v5.18.297 NoForceFill';
+  var VERSION = 'v5.18.298 NarOddsStateFix';
   var KEY = 'tk-sim-reservations-v1';
   var IMMEDIATE_KEY = 'tk-sweep-immediate-all-v1';
   var GUARD_KEY = 'tk-sweep-purchase-guard-v1';
@@ -25591,7 +25697,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.297 NoForceFill: 全て同意でも3点すべての旨み判定を維持 */
+/* v5.18.298 NarOddsStateFix: 全て同意でも3点すべての旨み判定を維持 */
 (function(){
   'use strict';
   function n(v){var x=Number(v);return Number.isFinite(x)?x:0}
@@ -25721,7 +25827,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.287 BatchSubmitAssist: 3点セット当日一括購入票＋公式投票サイト引き渡し */
 (function(){
   'use strict';
-  var VERSION='v5.18.297 NoForceFill';
+  var VERSION='v5.18.298 NarOddsStateFix';
   var RES_KEY='tk-sim-reservations-v1';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var PREF_KEY='tk-daily-batch-provider-v1';
@@ -25896,7 +26002,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.256 RangeSyncFix: 横2画面リアルタイム連動 */
 (function(){
   'use strict';
-  var V='v5.18.297 NoForceFill';
+  var V='v5.18.298 NarOddsStateFix';
   function applyVersion(){
     window.APP_VERSION=V;
     var el=document.querySelector('.header .ver, .ver');
@@ -26712,10 +26818,10 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.297 NoForceFill: 最終通信・買い目・比較表示経路を固定 */
+/* v5.18.298 NarOddsStateFix: 最終通信・買い目・比較表示経路を固定 */
 (function(){
   'use strict';
-  var VERSION='v5.18.297 NoForceFill';
+  var VERSION='v5.18.298 NarOddsStateFix';
   function ridFromUrl(url){
     var s=String(url||'');
     if(!/^https:\/\/nar(?:\.sp)?\.netkeiba\.com\//i.test(s))return '';
@@ -26781,12 +26887,12 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.297 NoForceFill: 全て同意は旨み条件を保ったユーザー強制優先層 */
+/* v5.18.298 NarOddsStateFix: 全て同意は旨み条件を保ったユーザー強制優先層 */
 (function(){
   'use strict';
   var MODE_KEY='all_agree';
   var MODE_LABEL='🤝 全て同意（ユーザー強制優先）';
-  var VERSION='v5.18.297 NoForceFill';
+  var VERSION='v5.18.298 NarOddsStateFix';
   var SETTINGS_KEY='tk-html-settings';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var DEFAULT_BASE_MODE='roi100';
