@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The競馬 EV分析 v5.18.303 NarHistoryDbOdds</title>
+<title>The競馬 EV分析 v5.18.304 NarHistoryDbOdds</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -662,7 +662,7 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button id="profitSplitBtn" class="btn-sm profit-split-toggle" type="button" onclick="toggleProfitLiveSplit()" aria-pressed="false">📊 横2画面</button>
-    <span class="ver">v5.18.303 NarHistoryDbOdds</span>
+    <span class="ver">v5.18.304 NarHistoryDbOdds</span>
     <span id="narBadge" class="nar-badge" style="display:none">NAR</span>
   </div>
 </div>
@@ -14268,11 +14268,11 @@ if(horses.length === 0){
     const fastMode = !!($('rsFast') && $('rsFast').checked);
     const todayForFast = (typeof todayYmd === 'function') ? todayYmd() : new Date().toISOString().slice(0,10);
 
-    // v5.18.302: 1か月を超えるNARを通常の1Rずつ直列処理にすると、1年指定では
-    // 数時間「実行中」に見える。購入ガード専用実行を除き、同じ精算ロジックを使う
-    // 一発モードへ自動移送する。リジューム指定もそのまま引き継ぐ。
-    if(kind === 'NAR' && dates.length > 31 && !purchaseGuardRun){
-      if(prog) prog.innerHTML = `<div class="url-status">🚄 ${dates.length}日間のNAR指定を検出。race_id日程探索＋一発モードへ自動切替します...</div>`;
+    // v5.18.304: 購入ガード・バックテストも通常実行と同じ一発経路へ統一する。
+    // 旧経路では日付ヘッダーだけを作って実レースを収集できず、R=0の行が
+    // 並ぶことがあった。長期間の通常実行も従来どおり一発モードへ切り替える。
+    if(purchaseGuardRun || (kind === 'NAR' && dates.length > 31)){
+      if(prog) prog.innerHTML = `<div class="url-status">🚄 ${purchaseGuardRun ? 'バックテスト' : dates.length+'日間の'+kind}を検出。race_id日程探索＋一発モードへ自動切替します...</div>`;
       await new Promise(resolve => setTimeout(resolve, 0));
       return await runRangeVenueSimulationOneShot(Object.assign({}, opts || {}, { autoLongRange:true }));
     }
@@ -23449,7 +23449,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
    ============================================================ */
 (function(){
   'use strict';
-  var VERSION = 'v5.18.303 NarHistoryDbOdds';
+  var VERSION = 'v5.18.304 NarHistoryDbOdds';
   var KEY = 'tk-sim-reservations-v1';
   var IMMEDIATE_KEY = 'tk-sweep-immediate-all-v1';
   var GUARD_KEY = 'tk-sweep-purchase-guard-v1';
@@ -26084,7 +26084,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.303 NarHistoryDbOdds: 全て同意でも3点すべての旨み判定を維持 */
+/* v5.18.304 NarHistoryDbOdds: 全て同意でも3点すべての旨み判定を維持 */
 (function(){
   'use strict';
   function n(v){var x=Number(v);return Number.isFinite(x)?x:0}
@@ -26214,7 +26214,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.287 BatchSubmitAssist: 3点セット当日一括購入票＋公式投票サイト引き渡し */
 (function(){
   'use strict';
-  var VERSION='v5.18.303 NarHistoryDbOdds';
+  var VERSION='v5.18.304 NarHistoryDbOdds';
   var RES_KEY='tk-sim-reservations-v1';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var PREF_KEY='tk-daily-batch-provider-v1';
@@ -26389,7 +26389,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.256 RangeSyncFix: 横2画面リアルタイム連動 */
 (function(){
   'use strict';
-  var V='v5.18.303 NarHistoryDbOdds';
+  var V='v5.18.304 NarHistoryDbOdds';
   function applyVersion(){
     window.APP_VERSION=V;
     var el=document.querySelector('.header .ver, .ver');
@@ -27205,10 +27205,10 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.303 NarHistoryDbOdds: 最終通信・買い目・比較表示経路を固定 */
+/* v5.18.304 NarHistoryDbOdds: 最終通信・買い目・比較表示経路を固定 */
 (function(){
   'use strict';
-  var VERSION='v5.18.303 NarHistoryDbOdds';
+  var VERSION='v5.18.304 NarHistoryDbOdds';
   function ridFromUrl(url){
     var s=String(url||'');
     if(!/^https:\/\/nar(?:\.sp)?\.netkeiba\.com\//i.test(s))return '';
@@ -27274,12 +27274,12 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.303 NarHistoryDbOdds: 全て同意は旨み条件を保ったユーザー強制優先層 */
+/* v5.18.304 NarHistoryDbOdds: 全て同意は旨み条件を保ったユーザー強制優先層 */
 (function(){
   'use strict';
   var MODE_KEY='all_agree';
   var MODE_LABEL='🤝 全て同意（ユーザー強制優先）';
-  var VERSION='v5.18.303 NarHistoryDbOdds';
+  var VERSION='v5.18.304 NarHistoryDbOdds';
   var SETTINGS_KEY='tk-html-settings';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var DEFAULT_BASE_MODE='roi100';
@@ -27539,7 +27539,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 // ============================================================
 (function(){
   'use strict';
-  const V274 = 'v5.18.303 NarHistoryDbOdds';
+  const V274 = 'v5.18.304 NarHistoryDbOdds';
   const LS_MODE = 'narGoMode_v1';
   const TTL_MS = 30000;
   const OFFICIAL_ODDS_FROM274 = '20260301';
