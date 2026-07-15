@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The競馬 EV分析 v5.18.299 NarOddsCompleteFetch</title>
+<title>The競馬 EV分析 v5.18.300 ResultConfirmStrict</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -662,7 +662,7 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button id="profitSplitBtn" class="btn-sm profit-split-toggle" type="button" onclick="toggleProfitLiveSplit()" aria-pressed="false">📊 横2画面</button>
-    <span class="ver">v5.18.299 NarOddsCompleteFetch</span>
+    <span class="ver">v5.18.300 ResultConfirmStrict</span>
     <span id="narBadge" class="nar-badge" style="display:none">NAR</span>
   </div>
 </div>
@@ -3312,6 +3312,9 @@ function renderHorseRows(){
   horses.forEach((h, i) => {
     const row = document.createElement('div');
     row.className = 'horse-row';
+    // v5.18.300: 人気は公開済みだが単勝0.0の馬は、取得失敗と区別して「未投票」と表示。
+    // 計算値は0のままなのでEV計算には混入しない。
+    const oddsPlaceholder = !(Number(h.odds) >= 1) && Number(h.pop) >= 1 ? '未投票' : '倍';
     row.innerHTML = `
       <input class="frame-in" type="number" value="${h.frame || ''}" min="1" max="8" placeholder="枠"
         onchange="horses[${i}].frame=Number(this.value)">
@@ -3319,7 +3322,7 @@ function renderHorseRows(){
         onchange="horses[${i}].num=Number(this.value)">
       <input type="text" value="${h.name || ''}" placeholder="馬名"
         onchange="horses[${i}].name=this.value">
-      <input class="odds-in" type="number" value="${h.odds || ''}" step="0.1" min="1" placeholder="倍"
+      <input class="odds-in" type="number" value="${h.odds || ''}" step="0.1" min="1" placeholder="${oddsPlaceholder}"
         onchange="horses[${i}].odds=Number(this.value)">
       <input class="pop-in" type="number" value="${h.pop || ''}" min="1" max="30" placeholder="人気"
         onchange="horses[${i}].pop=Number(this.value);checkPopDuplicate()">
@@ -8995,12 +8998,20 @@ async function fetchRace(){
       .filter(h => !(Number(h.odds) >= 1))
       .map(h => Number(h.num))
       .filter(n => n >= 1 && n <= 18);
+    const officialZeroOddsNums = horses
+      .filter(h => !(Number(h.odds) >= 1) && Number(h.pop) >= 1)
+      .map(h => Number(h.num))
+      .filter(n => n >= 1 && n <= 18);
+    const unknownOddsNums = missingOddsNums.filter(n => !officialZeroOddsNums.includes(n));
     const waitingOfficialOdds = !isResultPage && oddsCount === 0 && popCount === 0;
     const oddsNote = provisionalCount > 0
       ? ` / ※${provisionalCount}件は未取得のため予想用暫定値`
       : (waitingOfficialOdds ? ' / 単勝オッズ・人気は発売前または未取得（枠番から補完しません）' : '');
-    const partialOddsNote = !isResultPage && oddsCount > 0 && missingOddsNums.length
-      ? ` / 未公表・未取得: ${missingOddsNums.join('、')}番（再取得で更新）`
+    const partialParts = [];
+    if(officialZeroOddsNums.length) partialParts.push(`公式0.0・未投票: ${officialZeroOddsNums.join('、')}番`);
+    if(unknownOddsNums.length) partialParts.push(`未公表・未取得: ${unknownOddsNums.join('、')}番`);
+    const partialOddsNote = !isResultPage && oddsCount > 0 && partialParts.length
+      ? ` / ${partialParts.join(' / ')}（再取得で更新）`
       : '';
     const pageNote = isResultPage
       ? ' / result.html最終値'
@@ -9316,36 +9327,87 @@ function extractFrameFromRow(tr, horseNo){
   return Math.min(8, Math.max(1, Math.ceil(Number(horseNo || 1) / 2)));
 }
 
-// v5.18.298: URLが result.html であることと、結果確定済みであることを分離する。
-// 発走前でも result.html 自体はHTMLを返すため、URLだけで「最終値」と判定してはいけない。
-// 実際の結果表から1着・2着の両方を取得できた場合だけ確定済みとする。
+// v5.18.300: URLが result.html であることと、結果確定済みであることを分離する。
+// 発走前のresultページにも「着順」見出しや分析用の過去着順表が存在するため、
+// 実レース結果表の見出し・1着/2着・走破タイムが同じ表に揃った場合だけ確定済みとする。
 function isRaceResultConfirmedDoc(doc){
   if(!doc) return false;
-  // 着順ヘッダーを持つ「同一の馬結果表」内だけを見る。
-  // ページ全体の数字や予想順位表を横断すると発走前ページを確定扱いし得るため禁止する。
+
+  // netkeibaが発走前に明示するプレースホルダー。これがあれば無条件に未確定。
+  try{
+    const pageText = normCellText(doc.body || doc.documentElement).replace(/\s+/g,'');
+    if(/レース確定後(?:10分前後で)?公開予定です?/.test(pageText) ||
+       /結果(?:・払戻)?は(?:まだ)?公開されていません/.test(pageText)) return false;
+  }catch(e){}
+
+  function cleanHeader(c){ return normCellText(c).replace(/\s+/g,''); }
+  function rowRank(cells, rankIndex){
+    const direct = rankIndex >= 0 && cells[rankIndex]
+      ? toHalfNumberText(normCellText(cells[rankIndex])).trim()
+      : '';
+    let m = direct.match(/^([1-9]|1[0-8])(?:着)?$/);
+    if(m) return Number(m[1]);
+    // result表では着順が必ず馬名より左にある。左端3セルだけを保険走査する。
+    for(const c of cells.slice(0,3)){
+      m = toHalfNumberText(normCellText(c)).trim().match(/^([1-9]|1[0-8])(?:着)?$/);
+      if(m) return Number(m[1]);
+    }
+    return 0;
+  }
+  function rowHorseNum(cells, horseAnchor){
+    const horseCellIndex = cells.findIndex(c => c.contains && c.contains(horseAnchor));
+    if(horseCellIndex < 1) return 0;
+    // 馬名の直前にある独立整数が馬番。着順・枠番より馬名に近い側から読む。
+    for(let i=horseCellIndex-1; i>=0; i--){
+      const t = toHalfNumberText(normCellText(cells[i])).trim();
+      if(/^([1-9]|1[0-8])$/.test(t)) return Number(t);
+    }
+    return 0;
+  }
+  function rowHasRaceTime(cells, horseAnchor){
+    const horseCellIndex = cells.findIndex(c => c.contains && c.contains(horseAnchor));
+    const from = horseCellIndex >= 0 ? horseCellIndex + 1 : 0;
+    return cells.slice(from).some(c => {
+      const t = toHalfNumberText(normCellText(c)).replace(/\s+/g,'').trim();
+      return /^\d{1,2}:\d{2}\.\d$/.test(t);
+    });
+  }
+
+  // 通常版：実結果固有の列見出しをすべて持つ同一テーブルだけを見る。
+  // 「着順」だけの過去成績・分析テーブルはここで除外される。
   try{
     const tables = Array.from(doc.querySelectorAll('table'));
     for(const table of tables){
-      const headerRow = Array.from(table.querySelectorAll('tr')).find(r =>
-        Array.from(r.querySelectorAll('th,td')).some(c => /^着\s*順$/.test(normCellText(c).replace(/\s+/g,'')))
-      );
+      const headerRow = Array.from(table.querySelectorAll('tr')).find(r => {
+        const hs = Array.from(r.querySelectorAll('th,td')).map(cleanHeader);
+        return hs.some(t => /^着順$/.test(t)) &&
+               hs.some(t => /^馬番$/.test(t)) &&
+               hs.some(t => /^馬名/.test(t)) &&
+               hs.some(t => /^(タイム|時計)$/.test(t)) &&
+               hs.some(t => /^人気$|人気順/.test(t)) &&
+               hs.some(t => /単勝|オッズ/.test(t));
+      });
       if(!headerRow) continue;
-      const headers = Array.from(headerRow.children).map(c => normCellText(c).replace(/\s+/g,''));
+      const headers = Array.from(headerRow.children).map(cleanHeader);
       const rankIndex = headers.findIndex(t => /^着順$/.test(t));
       if(rankIndex < 0) continue;
       const ranks = new Set();
+      const horseNums = new Set();
       Array.from(table.querySelectorAll('tr')).forEach(tr => {
-        if(!tr.querySelector('a[href*="/horse/"]')) return;
-        const cells = Array.from(tr.children);
-        const t = toHalfNumberText(normCellText(cells[rankIndex])).trim();
-        const m = t.match(/^([1-9]|1[0-8])(?:着)?$/);
-        if(m) ranks.add(Number(m[1]));
+        const a = tr.querySelector('a[href*="/horse/"]');
+        if(!a) return;
+        const cells = Array.from(tr.querySelectorAll('td,th'));
+        if(!rowHasRaceTime(cells, a)) return;
+        const rank = rowRank(cells, rankIndex);
+        const num = rowHorseNum(cells, a);
+        if(rank >= 1) ranks.add(rank);
+        if(num >= 1 && num <= 18) horseNums.add(num);
       });
-      if(ranks.has(1) && ranks.has(2)) return true;
+      if(ranks.has(1) && ranks.has(2) && horseNums.size >= 2) return true;
     }
   }catch(e){}
 
-  // SP版などヘッダーが省略される場合は、結果表と判別できるclassを持つ表だけを保険走査。
+  // SP版など見出しが省略される場合は、結果表class＋走破タイムを必須にする。
   try{
     const tables = Array.from(doc.querySelectorAll(
       'table.RaceTable01, table.race_table_01, table[class*="Result"], table[class*="result"]'
@@ -9358,19 +9420,13 @@ function isRaceResultConfirmedDoc(doc){
         if(!a) return;
         const cells = Array.from(tr.querySelectorAll('td,th'));
         if(cells.length < 4) return;
-        const rankText = toHalfNumberText(normCellText(cells[0])).trim();
-        const rankMatch = rankText.match(/^([1-9]|1[0-8])(?:着)?$/);
-        if(!rankMatch) return;
+        if(!rowHasRaceTime(cells, a)) return;
+        const rank = rowRank(cells, 0);
+        if(!(rank >= 1)) return;
         let num = firstNumberInCell(tr.querySelector('.Umaban, [class*="Umaban"], [class*="HorseNum"]'), false);
-        if(!(num >= 1 && num <= 18)){
-          const horseCellIndex = cells.findIndex(c => c.contains(a));
-          for(let i=horseCellIndex-1; i>=0; i--){
-            const t = toHalfNumberText(normCellText(cells[i])).trim();
-            if(/^([1-9]|1[0-8])$/.test(t)){ num = Number(t); break; }
-          }
-        }
+        if(!(num >= 1 && num <= 18)) num = rowHorseNum(cells, a);
         if(!(num >= 1 && num <= 18)) return;
-        ranks.add(Number(rankMatch[1]));
+        ranks.add(rank);
         horseNums.add(num);
       });
       if(ranks.has(1) && ranks.has(2) && horseNums.size >= 2) return true;
@@ -23106,7 +23162,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
    ============================================================ */
 (function(){
   'use strict';
-  var VERSION = 'v5.18.299 NarOddsCompleteFetch';
+  var VERSION = 'v5.18.300 ResultConfirmStrict';
   var KEY = 'tk-sim-reservations-v1';
   var IMMEDIATE_KEY = 'tk-sweep-immediate-all-v1';
   var GUARD_KEY = 'tk-sweep-purchase-guard-v1';
@@ -25741,7 +25797,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.299 NarOddsCompleteFetch: 全て同意でも3点すべての旨み判定を維持 */
+/* v5.18.300 ResultConfirmStrict: 全て同意でも3点すべての旨み判定を維持 */
 (function(){
   'use strict';
   function n(v){var x=Number(v);return Number.isFinite(x)?x:0}
@@ -25871,7 +25927,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.287 BatchSubmitAssist: 3点セット当日一括購入票＋公式投票サイト引き渡し */
 (function(){
   'use strict';
-  var VERSION='v5.18.299 NarOddsCompleteFetch';
+  var VERSION='v5.18.300 ResultConfirmStrict';
   var RES_KEY='tk-sim-reservations-v1';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var PREF_KEY='tk-daily-batch-provider-v1';
@@ -26046,7 +26102,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.256 RangeSyncFix: 横2画面リアルタイム連動 */
 (function(){
   'use strict';
-  var V='v5.18.299 NarOddsCompleteFetch';
+  var V='v5.18.300 ResultConfirmStrict';
   function applyVersion(){
     window.APP_VERSION=V;
     var el=document.querySelector('.header .ver, .ver');
@@ -26862,10 +26918,10 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.299 NarOddsCompleteFetch: 最終通信・買い目・比較表示経路を固定 */
+/* v5.18.300 ResultConfirmStrict: 最終通信・買い目・比較表示経路を固定 */
 (function(){
   'use strict';
-  var VERSION='v5.18.299 NarOddsCompleteFetch';
+  var VERSION='v5.18.300 ResultConfirmStrict';
   function ridFromUrl(url){
     var s=String(url||'');
     if(!/^https:\/\/nar(?:\.sp)?\.netkeiba\.com\//i.test(s))return '';
@@ -26931,12 +26987,12 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.299 NarOddsCompleteFetch: 全て同意は旨み条件を保ったユーザー強制優先層 */
+/* v5.18.300 ResultConfirmStrict: 全て同意は旨み条件を保ったユーザー強制優先層 */
 (function(){
   'use strict';
   var MODE_KEY='all_agree';
   var MODE_LABEL='🤝 全て同意（ユーザー強制優先）';
-  var VERSION='v5.18.299 NarOddsCompleteFetch';
+  var VERSION='v5.18.300 ResultConfirmStrict';
   var SETTINGS_KEY='tk-html-settings';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var DEFAULT_BASE_MODE='roi100';
