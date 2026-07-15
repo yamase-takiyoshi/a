@@ -1,0 +1,243 @@
+// ==UserScript==
+// @name         The競馬 NAR/JRA Bridge (住宅IP)
+// @namespace    yamase-takiyoshi.takuya
+// @version      1.6.2
+// @description  Cloudflare WorkerがAkamaiに弾かれてもブリッジ（住宅IP＋本物Cookie）でnetkeibaを取得する。unsafeWindow直結＋postMessage両対応。v1.6.2: 画面右下の状態表示HUDを非表示化。
+// @author       新田
+// @match        https://yamase-takiyoshi.github.io/*
+// @connect      nar.netkeiba.com
+// @connect      race.netkeiba.com
+// @connect      www.netkeiba.com
+// @connect      db.netkeiba.com
+// @connect      netkeiba.com
+// @grant        GM_xmlhttpRequest
+// @grant        GM.xmlHttpRequest
+// @grant        unsafeWindow
+// @run-at       document-start
+// @noframes
+// ==/UserScript==
+
+(function () {
+  'use strict';
+
+  // ── ログ（Web Inspectorのコンソールで [narBridge] を検索すれば流れが追える）──
+  function log()  { try { console.log.apply(console, ['[narBridge]'].concat([].slice.call(arguments))); } catch (e) {} }
+  function warn() { try { console.warn.apply(console, ['[narBridge]'].concat([].slice.call(arguments))); } catch (e) {} }
+
+  // ── 状態記録の受け口（v1.6.2では画面にHUDを生成しない）──────────
+  // 既存の hud.set(...) 呼び出しを安全に受け流し、ブリッジ機能だけを動作させる。
+  var hud = { set: function () {} };
+
+  // ── ページ本体の window（サンドボックス注入でも実ページに書き込むため unsafeWindow を優先）──
+  var hasUnsafe = (typeof unsafeWindow !== 'undefined' && unsafeWindow && unsafeWindow !== window);
+  var pageWin = hasUnsafe ? unsafeWindow : window;
+
+  // ── GM API 検出 ────────────────────────────────────────────────
+  var hasGM_sync  = (typeof GM_xmlhttpRequest === 'function');
+  var hasGM_async = (typeof GM !== 'undefined' && GM && typeof GM.xmlHttpRequest === 'function');
+
+  log('loaded v1.6.2',
+      '| location=' + (location && location.href),
+      '| unsafeWindow=' + (hasUnsafe ? 'real(別world)' : (typeof unsafeWindow !== 'undefined' ? '=window(同一)' : 'なし')),
+      '| GM_xmlhttpRequest=' + hasGM_sync,
+      '| GM.xmlHttpRequest=' + hasGM_async);
+
+  hud.set('gm', hasGM_sync ? '✅ 同期' : (hasGM_async ? '✅ 非同期' : '❌ なし'));
+  hud.set('usw', hasUnsafe ? '✅ 実ページ' : (typeof unsafeWindow !== 'undefined' ? '⚠️ =window' : '⚠️ なし'));
+
+  if (!hasGM_sync && !hasGM_async) {
+    warn('GM_xmlhttpRequest / GM.xmlHttpRequest がどちらも見つかりません。' +
+         'Userscripts拡張の権限（@grant）と、netkeiba.comへのアクセス許可を確認してください。');
+  }
+
+  // ── 取得を許可するホスト（オープンリレー化を防ぐ）─────────────
+  function isAllowedHost(url) {
+    try {
+      var h = new URL(url).hostname.toLowerCase();
+      return h === 'netkeiba.com' || h.endsWith('.netkeiba.com');
+    } catch (e) { return false; }
+  }
+
+  // ── GM xhr ラッパー：GM_xmlhttpRequest / GM.xmlHttpRequest 両対応 ──
+  function gmXhr(opts) {
+    if (hasGM_sync) {
+      return GM_xmlhttpRequest(opts);
+    }
+    if (hasGM_async) {
+      var p = GM.xmlHttpRequest(opts);
+      if (p && typeof p.then === 'function') {
+        p.then(function (r) { if (opts.onload) opts.onload(r); },
+               function (e) { if (opts.onerror) opts.onerror(e || {}); });
+      }
+      return p;
+    }
+    if (opts.onerror) opts.onerror({ error: 'GM_xmlhttpRequest 未対応（Userscriptsの権限を確認）' });
+    return null;
+  }
+
+  // ── netkeibaは EUC-JP（ページにより Shift_JIS / UTF-8）。charset自動判定で復号 ──
+  function decodeBuffer(buf) {
+    var bytes = new Uint8Array(buf);
+    var head = '';
+    var n = Math.min(bytes.length, 4096);
+    for (var i = 0; i < n; i++) {
+      var c = bytes[i];
+      head += (c < 128) ? String.fromCharCode(c) : ' ';
+    }
+    var cs = 'euc-jp';
+    var m = head.match(/charset\s*=\s*["']?\s*([\w-]+)/i);
+    if (m) {
+      var v = m[1].toLowerCase();
+      if (/euc/.test(v)) cs = 'euc-jp';
+      else if (/shift|sjis|x-sjis|932/.test(v)) cs = 'shift_jis';
+      else if (/utf-?8/.test(v)) cs = 'utf-8';
+      else cs = v;
+    }
+    try { return new TextDecoder(cs, { fatal: false }).decode(bytes); }
+    catch (e) {
+      try { return new TextDecoder('euc-jp').decode(bytes); }
+      catch (e2) {
+        try { return new TextDecoder('utf-8').decode(bytes); }
+        catch (e3) { return ''; }
+      }
+    }
+  }
+
+  function refererFor(url) {
+    try { var u = new URL(url); return u.origin + '/'; }
+    catch (e) { return 'https://nar.netkeiba.com/'; }
+  }
+
+  // ── 低レベル取得：{status, text} で resolve、通信不能で reject ──────────
+  function bridgeFetch(url) {
+    return new Promise(function (resolve, reject) {
+      if (!isAllowedHost(url)) { reject(new Error('netkeiba以外のURLは取得しません: ' + url)); return; }
+      var done = false;
+      var settle = function (fn) { if (done) return; done = true; fn(); };
+      var t0 = Date.now();
+      log('fetch →', url);
+      gmXhr({
+        method: 'GET',
+        url: url,
+        responseType: 'arraybuffer',
+        timeout: 15000,
+        headers: {
+          'Referer': refererFor(url),
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'ja,en-US;q=0.8,en;q=0.6',
+          'X-Requested-With': 'nar-bridge'
+        },
+        onload: function (res) {
+          settle(function () {
+            var text = '';
+            try {
+              if (res && res.response && res.response.byteLength != null) {
+                text = decodeBuffer(res.response);
+              } else if (res && typeof res.responseText === 'string') {
+                text = res.responseText;
+              }
+            } catch (e) { warn('復号失敗', e); reject(new Error('復号失敗: ' + (e && e.message ? e.message : e))); return; }
+            var status = (res && typeof res.status === 'number') ? res.status : 0;
+            log('fetch ←', 'status=' + status, '本文' + (text ? text.length : 0) + '字', (Date.now() - t0) + 'ms');
+            // 非2xxでも status を持って resolve（呼び出し側が判断。0のみ失敗扱い）
+            if (!status) { reject(new Error('status 0（応答なし）')); return; }
+            resolve({ status: status, text: text || '' });
+          });
+        },
+        onerror: function (e) {
+          settle(function () {
+            var msg = 'GM xhr error: ' + ((e && (e.error || e.message)) || 'unknown');
+            warn(msg, '| netkeiba.comへのアクセス許可（Safari設定→機能拡張→Userscripts）を確認してください');
+            reject(new Error(msg));
+          });
+        },
+        ontimeout: function () {
+          settle(function () { warn('timeout 15s', url); reject(new Error('netkeibaタイムアウト（15s）')); });
+        },
+        onabort: function () {
+          settle(function () { reject(new Error('aborted')); });
+        }
+      });
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  経路1（本命）: unsafeWindow でページの window に取得関数を直接注入。
+  //  postMessageがサンドボックス境界を越えないiPhone Safari等でも確実に動く。
+  //  index.html 側は __narBridgeDirect / __narBridgeHasDirect を検出して最優先採用する。
+  // ══════════════════════════════════════════════════════════════════
+  try {
+    pageWin.__narBridgeDirect = function (url) { return bridgeFetch(url); };
+    pageWin.__narBridgeHasDirect = true;
+    log('経路1: __narBridgeDirect を ' + (hasUnsafe ? 'ページwindow(unsafeWindow)' : 'window') + ' に注入しました');
+    hud.set('route1', hasUnsafe ? '✅ ページwindow' : '⚠️ 別world(要経路2)');
+    if (!hasUnsafe) {
+      warn('unsafeWindowが実ページwindowではないため、経路1はページ本体に届かない可能性があります（→経路2 postMessageに依存）');
+    }
+  } catch (e) {
+    warn('経路1注入に失敗', e);
+    hud.set('route1', '❌ 失敗');
+  }
+
+  // ══════════════════════════════════════════════════════════════════
+  //  経路2（後方互換）: postMessage 契約（iPadなど境界が通る環境用）。
+  // ══════════════════════════════════════════════════════════════════
+  function respondOk(id, status, text) {
+    try {
+      window.postMessage({ __narBridge: 'response', id: id, status: status, text: text || '' }, '*');
+    } catch (e) {
+      respondError(id, 'postMessage失敗（本文' + ((text && text.length) || 0) + '字）: ' + (e && e.message));
+    }
+  }
+  function respondError(id, msg) {
+    try { window.postMessage({ __narBridge: 'response', id: id, status: 0, error: String(msg || 'bridge error') }, '*'); } catch (e) {}
+  }
+
+  var reqCount = 0;
+  window.addEventListener('message', function (ev) {
+    // realmが分かれると ev.source !== window になり得るため source は厳格判定しない。
+    // 取得先は isAllowedHost で netkeiba に限定済み（オープンリレー化しない）。
+    var d = ev && ev.data;
+    if (!d || d.__narBridge !== 'request' || !d.id || !d.url) return;
+    reqCount++;
+    hud.set('req', String(reqCount));
+    log('経路2: request受信 #' + reqCount, d.url);
+    bridgeFetch(d.url).then(
+      function (r) { respondOk(d.id, r.status, r.text); },
+      function (e) { respondError(d.id, (e && e.message) || 'bridge error'); }
+    );
+  }, false);
+
+  // ── ready ハンドシェイク（経路2用。リスナー登録タイミングに勝つため複数回）──
+  var readyN = 0;
+  function announceReady() { readyN++; hud.set('ready', String(readyN)); try { window.postMessage({ __narBridge: 'ready' }, '*'); } catch (e) {} }
+  announceReady();
+  [200, 600, 1200, 2500, 5000, 8000].forEach(function (t) { setTimeout(announceReady, t); });
+  document.addEventListener('DOMContentLoaded', announceReady, false);
+  window.addEventListener('load', function () { announceReady(); log('ready を ' + readyN + ' 回ブロードキャストしました（経路2）'); }, false);
+
+  // ══════════════════════════════════════════════════════════════════
+  //  自己診断（v1.6.0）: 読み込み1.5秒後に netkeiba へ実際に1回だけアクセスし、
+  //  「このUserscriptからGM経由でnetkeibaに繋がるか」をコンソールに出す。
+  //  ・成功(status表示) → ブリッジ〜netkeibaはOK。繋がらないのはアプリへの橋渡し側（経路1/2）。
+  //  ・失敗(error/timeout) → netkeiba.comへのアクセス許可 or @connect を確認。
+  //  不要になったら下のブロックを削除してよい（動作には影響しない）。
+  // ══════════════════════════════════════════════════════════════════
+  setTimeout(function () {
+    var probe = 'https://nar.netkeiba.com/';
+    hud.set('probe', '⏳ 実行中…');
+    log('自己診断: ' + probe + ' へテスト取得します…');
+    bridgeFetch(probe).then(
+      function (r) {
+        hud.set('probe', '✅ 到達 (' + r.status + '/' + (r.text ? r.text.length : 0) + '字)');
+        log('✅ 自己診断OK: netkeibaにGM経由で到達（status=' + r.status + ' / 本文' + (r.text ? r.text.length : 0) + '字）。' +
+            'これが出るのに🌉が付かない場合は、アプリへの橋渡し（経路1/2）側の問題です。');
+      },
+      function (e) {
+        hud.set('probe', '❌ ' + ((e && e.message) || 'NG'));
+        warn('❌ 自己診断NG: netkeibaに到達できません →', (e && e.message) || e,
+             '｜Safari設定→機能拡張→Userscripts で netkeiba.com（および nar.netkeiba.com / race.netkeiba.com）を「許可」にしてください');
+      }
+    );
+  }, 1500);
+})();
