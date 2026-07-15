@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The競馬 EV分析 v5.18.298 NarOddsStateFix</title>
+<title>The競馬 EV分析 v5.18.299 NarOddsCompleteFetch</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -662,7 +662,7 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button id="profitSplitBtn" class="btn-sm profit-split-toggle" type="button" onclick="toggleProfitLiveSplit()" aria-pressed="false">📊 横2画面</button>
-    <span class="ver">v5.18.298 NarOddsStateFix</span>
+    <span class="ver">v5.18.299 NarOddsCompleteFetch</span>
     <span id="narBadge" class="nar-badge" style="display:none">NAR</span>
   </div>
 </div>
@@ -8489,20 +8489,41 @@ async function fetchWinOddsPopularity(kind, raceId, expectedHorses){
   }
   dbgAppend(`🔍 オッズ取得開始: ${raceId}`);
 
+  // v5.18.299: 2件取れただけで成功終了すると、発売直後に一部の馬だけ
+  // オッズ未公表だった場合、その後に並ぶ最新の odds / shutuba を見ない。
+  // 出走馬数を満たすまで全経路を確認し、後から取得した値を優先して統合する。
+  const expectedNums = new Set((Array.isArray(expectedHorses) ? expectedHorses : [])
+    .map(h => Number(h && h.num))
+    .filter(n => n >= 1 && n <= 18));
+  const expectedCount = expectedNums.size;
+  let collected = new Map();
+
   for(const url of buildNetkeibaOddsUrls(kind, raceId)){
-    const shortUrl = url.replace('https://race.netkeiba.com','').replace('https://nar.netkeiba.com','');
+    const shortUrl = url
+      .replace('https://race.netkeiba.com','')
+      .replace('https://nar.netkeiba.com','')
+      .replace('https://nar.sp.netkeiba.com','/sp');
     try{
       const html = await fetchHtmlViaProxy(url);
       if(!html){ dbgAppend(`⬜ 空レスポンス: ${shortUrl}`); continue; }
       const doc = new DOMParser().parseFromString(html, 'text/html');
 
-      let map = url.includes('result.html')
+      // 発走前の result.html には出馬表相当の断片や一部オッズが入ることがある。
+      // 実着順が確定していない限り「最終オッズ」として採用しない。
+      const isResultUrl = url.includes('result.html');
+      const resultConfirmed = isResultUrl && isRaceResultConfirmedDoc(doc);
+      if(isResultUrl && !resultConfirmed){
+        dbgAppend(`🕒 result.html 未確定 → スキップ`);
+        continue;
+      }
+
+      let map = isResultUrl
         ? parseFinalOddsPopularityFromResultDoc(doc, expectedHorses)
         : parseWinOddsPopularityFromDoc(doc);
 
       // v5.18.127: 馬名JOINを最優先（オッズ表の馬番列誤読・人気順並びを回避）。
       // 出馬表で確定済みの「馬名→馬番」に、オッズ表の「馬名→オッズ」を貼り直す。
-      if(!url.includes('result.html') && Array.isArray(expectedHorses) && expectedHorses.length){
+      if(!isResultUrl && Array.isArray(expectedHorses) && expectedHorses.length){
         const byName2 = parseOddsByNameFromOddsDoc(doc);
         if(byName2.size >= 2){
           const nameKeyed = new Map();
@@ -8520,8 +8541,10 @@ async function fetchWinOddsPopularity(kind, raceId, expectedHorses){
         }
       }
 
-      if(url.includes('result.html')){
+      if(isResultUrl){
         dbgAppend(`📄 result.html → ${map.size}件取得`);
+        // 確定結果は取消・除外馬に単勝値が無いことがあるため、2件以上なら
+        // 出走馬数を満たさなくてもこの結果表を正とする。
         if(map.size >= 2) return map;
       }
 
@@ -8538,15 +8561,29 @@ async function fetchWinOddsPopularity(kind, raceId, expectedHorses){
         map = mergeOddsMaps(map, sMap);
       }
 
-      dbgAppend(`${map.size >= 2 ? '✅' : '❌'} ${shortUrl} → ${map.size}件`);
-      if(map.size >= 2) return map;
+      // 同じ馬番は今回（後から取得した経路）の値を優先し、今回に無い馬だけ
+      // それ以前の経路から補完する。古い10件＋新しい2件の混在を避ける。
+      collected = mergeOddsMaps(map, collected);
+      const complete = expectedCount >= 2 && expectedNums.size === expectedCount &&
+        Array.from(expectedNums).every(n => collected.has(n) && Number(collected.get(n)?.odds) >= 1);
+      dbgAppend(`${complete ? '✅' : (collected.size >= 2 ? '🟨' : '❌')} ${shortUrl} → 今回${map.size}件 / 累計${collected.size}${expectedCount ? `/${expectedCount}` : ''}件`);
+
+      if(complete) return collected;
+      if(!expectedCount && collected.size >= 2) return collected;
     }catch(e){
       dbgAppend(`💥 エラー: ${shortUrl} → ${e.message || e}`);
       console.warn('odds fetch failed:', e);
     }
   }
+  if(collected.size >= 2){
+    const missing = expectedCount
+      ? Array.from(expectedNums).filter(n => !collected.has(n) || !(Number(collected.get(n)?.odds) >= 1))
+      : [];
+    dbgAppend(`⚠️ 一部のみ取得（${collected.size}/${expectedCount || '?'}件${missing.length ? `、未公表/未取得: ${missing.join(',')}番` : ''}）`);
+    return collected;
+  }
   dbgAppend('⚠️ オッズ取得失敗（全URL試行済み）');
-  return new Map();
+  return collected;
 }
 
 function mergeOddsPopularityIntoHorses(baseHorses, oddsMap){
@@ -8954,17 +8991,24 @@ async function fetchRace(){
     const popCount = horses.filter(h => Number(h.pop) >= 1).length;
     const provisionalCount = horses.filter(h => h.provisionalOdds).length;
     const frameCount = horses.filter(h => Number(h.frame) >= 1 && Number(h.frame) <= 8).length;
+    const missingOddsNums = horses
+      .filter(h => !(Number(h.odds) >= 1))
+      .map(h => Number(h.num))
+      .filter(n => n >= 1 && n <= 18);
     const waitingOfficialOdds = !isResultPage && oddsCount === 0 && popCount === 0;
     const oddsNote = provisionalCount > 0
       ? ` / ※${provisionalCount}件は未取得のため予想用暫定値`
       : (waitingOfficialOdds ? ' / 単勝オッズ・人気は発売前または未取得（枠番から補完しません）' : '');
+    const partialOddsNote = !isResultPage && oddsCount > 0 && missingOddsNums.length
+      ? ` / 未公表・未取得: ${missingOddsNums.join('、')}番（再取得で更新）`
+      : '';
     const pageNote = isResultPage
       ? ' / result.html最終値'
       : (/\/race\/result\.html/i.test(activeUrl) ? ' / 結果未確定' : '');
     if(oddsMisKeyed){
       status.innerHTML = `<div class="url-status err">⚠️ 単勝オッズが「馬番=人気=オッズ昇順」と完全一致しました（取得元の人気順テーブルを馬番にそのまま割り当てた誤キーの疑い）。本物の値ではないため、汚染防止にオッズ・人気を破棄しました。<br>馬名・枠・馬番（${horses.length}頭）は取得済みです。時間をおいて再取得するか、各馬のオッズ/人気を手入力してください。</div>`;
     }else{
-      status.innerHTML = `<div class="url-status${waitingOfficialOdds ? '' : ' ok'}">✅ ${escapeHtml(currentRaceName || '')} ${horses.length}頭 取得しました${pageNote} / 単勝オッズ ${oddsCount}件 / 人気 ${popCount}件 / 枠番 ${frameCount}件${oddsNote}</div>`;
+      status.innerHTML = `<div class="url-status${waitingOfficialOdds ? '' : ' ok'}">✅ ${escapeHtml(currentRaceName || '')} ${horses.length}頭 取得しました${pageNote} / 単勝オッズ ${oddsCount}件 / 人気 ${popCount}件 / 枠番 ${frameCount}件${oddsNote}${partialOddsNote}</div>`;
     }
 
     // v5.18.244: 取得成功時にD1へ自動同期
@@ -23062,7 +23106,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
    ============================================================ */
 (function(){
   'use strict';
-  var VERSION = 'v5.18.298 NarOddsStateFix';
+  var VERSION = 'v5.18.299 NarOddsCompleteFetch';
   var KEY = 'tk-sim-reservations-v1';
   var IMMEDIATE_KEY = 'tk-sweep-immediate-all-v1';
   var GUARD_KEY = 'tk-sweep-purchase-guard-v1';
@@ -25697,7 +25741,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.298 NarOddsStateFix: 全て同意でも3点すべての旨み判定を維持 */
+/* v5.18.299 NarOddsCompleteFetch: 全て同意でも3点すべての旨み判定を維持 */
 (function(){
   'use strict';
   function n(v){var x=Number(v);return Number.isFinite(x)?x:0}
@@ -25827,7 +25871,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.287 BatchSubmitAssist: 3点セット当日一括購入票＋公式投票サイト引き渡し */
 (function(){
   'use strict';
-  var VERSION='v5.18.298 NarOddsStateFix';
+  var VERSION='v5.18.299 NarOddsCompleteFetch';
   var RES_KEY='tk-sim-reservations-v1';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var PREF_KEY='tk-daily-batch-provider-v1';
@@ -26002,7 +26046,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.256 RangeSyncFix: 横2画面リアルタイム連動 */
 (function(){
   'use strict';
-  var V='v5.18.298 NarOddsStateFix';
+  var V='v5.18.299 NarOddsCompleteFetch';
   function applyVersion(){
     window.APP_VERSION=V;
     var el=document.querySelector('.header .ver, .ver');
@@ -26818,10 +26862,10 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.298 NarOddsStateFix: 最終通信・買い目・比較表示経路を固定 */
+/* v5.18.299 NarOddsCompleteFetch: 最終通信・買い目・比較表示経路を固定 */
 (function(){
   'use strict';
-  var VERSION='v5.18.298 NarOddsStateFix';
+  var VERSION='v5.18.299 NarOddsCompleteFetch';
   function ridFromUrl(url){
     var s=String(url||'');
     if(!/^https:\/\/nar(?:\.sp)?\.netkeiba\.com\//i.test(s))return '';
@@ -26887,12 +26931,12 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.298 NarOddsStateFix: 全て同意は旨み条件を保ったユーザー強制優先層 */
+/* v5.18.299 NarOddsCompleteFetch: 全て同意は旨み条件を保ったユーザー強制優先層 */
 (function(){
   'use strict';
   var MODE_KEY='all_agree';
   var MODE_LABEL='🤝 全て同意（ユーザー強制優先）';
-  var VERSION='v5.18.298 NarOddsStateFix';
+  var VERSION='v5.18.299 NarOddsCompleteFetch';
   var SETTINGS_KEY='tk-html-settings';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var DEFAULT_BASE_MODE='roi100';
