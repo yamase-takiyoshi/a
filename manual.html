@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>期間横断シミュレーション ウィザード操作マニュアル</title>
+<style>
+:root{
+  --green:#0f6b45;
+  --green2:#16885a;
+  --pale:#eef8f3;
+  --line:#cfe3d9;
+  --ink:#183028;
+  --muted:#64756e;
+  --warn:#fff5d8;
+  --danger:#fff0ee;
+  --blue:#eaf3ff;
+  --shadow:0 8px 24px rgba(16,67,48,.10);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:#f5f8f6;
+  color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Yu Gothic",Meiryo,sans-serif;
+  line-height:1.75;
+}
+header{
+  background:linear-gradient(135deg,#0c5738,#16885a);
+  color:#fff;
+  padding:28px 18px 24px;
+}
+header .inner,main,.footer-inner{max-width:760px;margin:auto}
+.kicker{font-size:12px;letter-spacing:.12em;opacity:.85;font-weight:800}
+h1{font-size:28px;line-height:1.35;margin:8px 0 10px}
+.lead{margin:0;font-size:15px;opacity:.95}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.badge{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.25);padding:6px 10px;border-radius:999px;font-size:12px;font-weight:700}
+main{padding:18px 14px 44px}
+.card{
+  background:#fff;
+  border:1px solid #e1ebe6;
+  border-radius:18px;
+  padding:18px;
+  margin:14px 0;
+  box-shadow:var(--shadow);
+}
+h2{font-size:21px;margin:0 0 12px;line-height:1.45}
+h3{font-size:17px;margin:18px 0 8px}
+p{margin:8px 0}
+strong{color:#0b5839}
+.toc a{
+  display:block;
+  color:var(--green);
+  text-decoration:none;
+  border-bottom:1px solid #edf2ef;
+  padding:10px 2px;
+  font-weight:700;
+}
+.toc a:last-child{border-bottom:0}
+.step-head{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.step-no{
+  min-width:42px;height:42px;border-radius:50%;
+  display:grid;place-items:center;
+  background:var(--green);color:white;font-weight:900;font-size:20px;
+}
+.step-title{font-weight:900;font-size:20px;line-height:1.35}
+.screen{
+  background:#f8faf9;
+  border:2px solid #20352d;
+  border-radius:22px;
+  padding:10px;
+  margin:14px 0;
+  box-shadow:inset 0 0 0 5px #e6ece9;
+}
+.phone-top{
+  width:84px;height:6px;border-radius:999px;background:#24352f;
+  margin:0 auto 10px;
+}
+.appbar{
+  background:#124f38;color:#fff;border-radius:10px 10px 6px 6px;
+  padding:10px 12px;font-weight:900;font-size:14px;
+}
+.panel{
+  background:#fff;border:1px solid #d9e6df;border-radius:10px;
+  margin-top:8px;padding:10px;
+}
+.panel-title{font-size:13px;font-weight:900;color:#184f3c;margin-bottom:8px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.field,.select,.date{
+  min-height:42px;border:1px solid #bccfc5;border-radius:8px;
+  padding:9px;background:white;font-size:13px;color:#2f463d;
+}
+.label{font-size:11px;color:#687970;font-weight:800;margin-bottom:3px}
+.full{grid-column:1/-1}
+.checks{display:flex;gap:7px;flex-wrap:wrap}
+.check{
+  border:1px solid #b7cbc0;border-radius:7px;padding:7px 9px;
+  font-size:12px;background:#fff;
+}
+.check.on{background:#e7f7ef;border-color:#24875d;color:#125c3d;font-weight:900}
+.btn{
+  display:block;width:100%;border:0;border-radius:10px;
+  padding:12px;font-size:14px;font-weight:900;text-align:center;
+  margin-top:8px;
+}
+.btn.primary{background:var(--green2);color:white}
+.btn.sub{background:#edf4f0;color:#23483a;border:1px solid #c6d9cf}
+.btn.stop{background:#fbe9e6;color:#8a3326}
+.callout{
+  border-left:5px solid var(--green2);
+  background:var(--pale);
+  padding:12px 13px;
+  border-radius:10px;
+  margin:12px 0;
+}
+.callout.warn{background:var(--warn);border-color:#d49d16}
+.callout.danger{background:var(--danger);border-color:#c95443}
+.callout.info{background:var(--blue);border-color:#397dcc}
+.arrow{
+  text-align:center;font-size:30px;line-height:1;color:#16885a;
+  margin:4px 0;
+}
+.tap{
+  display:inline-block;
+  background:#fff1ad;
+  border:2px solid #e0b500;
+  border-radius:999px;
+  padding:2px 8px;
+  font-weight:900;
+  color:#604e00;
+}
+.marker{position:relative}
+.marker::after{
+  content:"ここをタップ";
+  display:inline-block;
+  margin-left:8px;
+  padding:3px 7px;
+  border-radius:999px;
+  background:#ffdf4d;color:#4e4200;
+  font-size:11px;font-weight:900;
+}
+.flow{
+  display:grid;grid-template-columns:1fr;gap:8px;
+}
+.flow div{
+  background:#f4f8f6;border:1px solid #d8e6df;border-radius:12px;
+  padding:11px 12px;font-weight:800;
+}
+.flow span{
+  display:inline-grid;place-items:center;width:28px;height:28px;
+  border-radius:50%;background:var(--green);color:#fff;margin-right:8px;
+}
+.result-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:8px}
+.result-table th,.result-table td{border:1px solid #d7e3dd;padding:7px 5px;text-align:center}
+.result-table th{background:#edf6f1}
+.ok{color:#087044;font-weight:900}
+.minus{color:#b23a2f;font-weight:900}
+details{
+  border:1px solid #dbe6e0;border-radius:12px;background:#fff;margin:9px 0;
+  overflow:hidden;
+}
+summary{padding:12px 14px;font-weight:900;cursor:pointer;background:#f7faf8}
+details div{padding:12px 14px}
+.sticky{
+  position:sticky;bottom:10px;z-index:10;
+  display:flex;gap:8px;margin:18px 0 0;
+}
+.sticky a{
+  flex:1;text-decoration:none;text-align:center;
+  background:#0f6b45;color:#fff;padding:12px 8px;border-radius:12px;
+  font-weight:900;box-shadow:0 5px 16px rgba(15,107,69,.25);
+}
+.small{font-size:12px;color:var(--muted)}
+footer{background:#19332a;color:#eaf5ef;padding:24px 16px}
+footer p{margin:4px 0}
+@media(min-width:680px){
+  h1{font-size:34px}
+  .flow{grid-template-columns:1fr 1fr}
+}
+@media print{
+  body{background:white}
+  .sticky{display:none}
+  .card{box-shadow:none;break-inside:avoid}
+}
+</style>
+</head>
+<body>
+<header>
+  <div class="inner">
+    <div class="kicker">THE 競馬 EV分析・スマホ版</div>
+    <h1>期間横断シミュレーション<br>ウィザード操作マニュアル</h1>
+    <p class="lead">初めて使う方でも、期間の設定から結果確認まで順番に進められる図解ガイドです。</p>
+    <div class="badges">
+      <span class="badge">スマホ対応</span>
+      <span class="badge">JRA・NAR対応</span>
+      <span class="badge">初心者向け</span>
+      <span class="badge">単一HTML</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>まず覚えること</h2>
+    <p>期間横断シミュレーションは、指定した開始日から終了日までの開催を順番に調べ、現在の予想設定と予算設定で買い目を作り、確定済みレースの払戻を使って収支を計算する機能です。</p>
+    <div class="callout warn"><strong>実際のお金は動きません。</strong><br>これは過去データを使うバックテスト・検証機能です。</div>
+    <div class="flow">
+      <div><span>1</span>シミュレーション画面を開く</div>
+      <div><span>2</span>JRAまたはNARを選ぶ</div>
+      <div><span>3</span>開始日と終了日を決める</div>
+      <div><span>4</span>開催場を選ぶ</div>
+      <div><span>5</span>実行する</div>
+      <div><span>6</span>収支とROIを確認する</div>
+    </div>
+  </section>
+
+  <section class="card toc">
+    <h2>目次</h2>
+    <a href="#step1">1. ウィザードを開く</a>
+    <a href="#step2">2. 区分を選ぶ</a>
+    <a href="#step3">3. 期間を設定する</a>
+    <a href="#step4">4. 開催場を選ぶ</a>
+    <a href="#step5">5. 実行する</a>
+    <a href="#step6">6. 結果を読む</a>
+    <a href="#resume">中断・再開の方法</a>
+    <a href="#trouble">困ったとき</a>
+  </section>
+
+  <section class="card" id="step1">
+    <div class="step-head"><div class="step-no">1</div><div class="step-title">ウィザードを開く</div></div>
+    <p>画面上部のタブから <span class="tap">♞ シミュレーション</span> を開きます。その後、下へスクロールして「期間×開催場 横断シミュレーション」を探します。</p>
+    <div class="screen">
+      <div class="phone-top"></div>
+      <div class="appbar">♞ The競馬 EV分析</div>
+      <div class="panel">
+        <div class="checks">
+          <div class="check">馬データ</div>
+          <div class="check">推奨買い目</div>
+          <div class="check on marker">♞ シミュレーション</div>
+          <div class="check">競馬ライブ</div>
+          <div class="check">⚙️ 設定</div>
+        </div>
+      </div>
+      <div class="arrow">↓</div>
+      <div class="panel">
+        <div class="panel-title">📅 期間×開催場 横断シミュレーション</div>
+        <div class="small">開始日〜終了日の全開催をまとめて検証します。</div>
+      </div>
+    </div>
+    <div class="callout info">スマホでは項目が縦に並びます。見つからない場合は、シミュレーション画面をゆっくり下へスクロールしてください。</div>
+  </section>
+
+  <section class="card" id="step2">
+    <div class="step-head"><div class="step-no">2</div><div class="step-title">JRAまたはNARを選ぶ</div></div>
+    <p>中央競馬を調べる場合は <strong>JRA</strong>、地方競馬を調べる場合は <strong>NAR</strong> を選びます。</p>
+    <div class="screen">
+      <div class="phone-top"></div>
+      <div class="appbar">期間横断ウィザード</div>
+      <div class="panel">
+        <div class="panel-title">区分</div>
+        <div class="checks">
+          <div class="check on marker">JRA 中央</div>
+          <div class="check">NAR 地方</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout"><strong>迷ったら</strong><br>東京・中山・京都・阪神などはJRA。盛岡・水沢・大井・園田・高知などはNARです。</div>
+  </section>
+
+  <section class="card" id="step3">
+    <div class="step-head"><div class="step-no">3</div><div class="step-title">開始日と終了日を設定する</div></div>
+    <p>調べたい最初の日を「開始日」、最後の日を「終了日」に入力します。</p>
+    <div class="screen">
+      <div class="phone-top"></div>
+      <div class="appbar">期間の設定</div>
+      <div class="panel">
+        <div class="row">
+          <div>
+            <div class="label">開始日</div>
+            <div class="date marker">2025-07-01</div>
+          </div>
+          <div>
+            <div class="label">終了日</div>
+            <div class="date marker">2025-07-31</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="callout warn"><strong>最初は短い期間がおすすめです。</strong><br>初回は3日〜7日程度で動作を確認し、慣れてから1か月、3か月、1年へ広げてください。</div>
+    <p class="small">終了日は開始日より後の日付にします。同じ日を指定すると1日分だけ調べます。</p>
+  </section>
+
+  <section class="card" id="step4">
+    <div class="step-head"><div class="step-no">4</div><div class="step-title">開催場を選ぶ</div></div>
+    <p>調べたい競馬場だけにチェックを付けます。何も選ばない場合は、その日に実際に開催された全競馬場が自動で対象になります。</p>
+    <div class="screen">
+      <div class="phone-top"></div>
+      <div class="appbar">開催場の設定</div>
+      <div class="panel">
+        <div class="panel-title">開催場</div>
+        <div class="checks">
+          <div class="check on">東京</div>
+          <div class="check on">京都</div>
+          <div class="check">阪神</div>
+          <div class="check">中山</div>
+        </div>
+        <div class="row">
+          <div class="btn sub">全選択</div>
+          <div class="btn sub">全解除</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout">
+      <strong>おすすめの使い分け</strong><br>
+      全体傾向を見る → 何も選ばない<br>
+      特定場だけ検証 → その場だけ選ぶ<br>
+      複数場を比較 → 比べたい場を複数選ぶ
+    </div>
+  </section>
+
+  <section class="card" id="step5">
+    <div class="step-head"><div class="step-no">5</div><div class="step-title">実行ボタンを押す</div></div>
+    <p>設定を確認し、<span class="tap">期間横断シミュレーション実行</span> をタップします。</p>
+    <div class="screen">
+      <div class="phone-top"></div>
+      <div class="appbar">実行</div>
+      <div class="panel">
+        <div class="checks">
+          <div class="check on">高速モード</div>
+          <div class="check">地方移動EV補正</div>
+        </div>
+        <div class="btn primary marker">▶ 期間横断シミュレーション実行</div>
+        <div class="row">
+          <div class="btn stop">⏹ 中断</div>
+          <div class="btn sub">▶ 続きから再開</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout"><strong>長期間は「高速モード」がおすすめです。</strong><br>通信回数と画面更新を減らし、大量レースの処理を軽くします。計算方法や出力形式は通常モードと同じです。</div>
+    <div class="callout danger"><strong>実行中は画面を閉じないでください。</strong><br>スマホのブラウザをバックグラウンドへ移すと、処理が止まったり遅くなったりする場合があります。</div>
+  </section>
+
+  <section class="card" id="step6">
+    <div class="step-head"><div class="step-no">6</div><div class="step-title">結果を確認する</div></div>
+    <p>処理が終わると、開催日・開催場ごとの投資、払戻、収支、ROIと、全期間トータルが表示されます。</p>
+    <div class="screen">
+      <div class="phone-top"></div>
+      <div class="appbar">開催場・日別集計</div>
+      <div class="panel">
+        <table class="result-table">
+          <tr><th>日付</th><th>場</th><th>投資</th><th>払戻</th><th>ROI</th></tr>
+          <tr><td>7/05</td><td>東京</td><td>1,800</td><td>2,340</td><td class="ok">130%</td></tr>
+          <tr><td>7/06</td><td>東京</td><td>1,200</td><td>0</td><td class="minus">0%</td></tr>
+          <tr><th colspan="2">全期間</th><th>3,000</th><th>2,340</th><th>78%</th></tr>
+        </table>
+      </div>
+    </div>
+    <h3>数字の意味</h3>
+    <div class="flow">
+      <div><span>投</span>投資：買った想定金額</div>
+      <div><span>払</span>払戻：当たった払戻総額</div>
+      <div><span>収</span>収支：払戻－投資</div>
+      <div><span>R</span>ROI：払戻÷投資×100</div>
+    </div>
+    <div class="callout warn"><strong>ROIの見方</strong><br>
+      100%より上＝プラス<br>
+      100%＝収支ゼロ<br>
+      100%より下＝マイナス
+    </div>
+  </section>
+
+  <section class="card" id="resume">
+    <h2>途中で止めたい・続きから再開したい</h2>
+    <p>長期間の処理では、無理に最後まで続ける必要はありません。</p>
+    <div class="screen">
+      <div class="phone-top"></div>
+      <div class="appbar">中断と再開</div>
+      <div class="panel">
+        <div class="btn stop marker">⏹ 中断</div>
+        <div class="btn sub marker">▶ 続きから再開</div>
+      </div>
+    </div>
+    <p><strong>中断</strong>を押すと、現在の進行位置を残して処理を止めます。後で同じページを開き、<strong>続きから再開</strong>を押すと、未処理部分から再開します。</p>
+    <div class="callout info">念のため、長期間の結果は「期間横断JSON出力」で保存しておくと安心です。</div>
+  </section>
+
+  <section class="card">
+    <h2>初心者向けおすすめ設定</h2>
+    <table class="result-table">
+      <tr><th>項目</th><th>最初のおすすめ</th></tr>
+      <tr><td>期間</td><td>3日〜7日</td></tr>
+      <tr><td>区分</td><td>JRAかNARの片方</td></tr>
+      <tr><td>開催場</td><td>1場だけ</td></tr>
+      <tr><td>高速モード</td><td>ON</td></tr>
+      <tr><td>1点額</td><td>100円</td></tr>
+      <tr><td>日次上限</td><td>1,800円</td></tr>
+      <tr><td>確認項目</td><td>投資・払戻・収支・ROI</td></tr>
+    </table>
+  </section>
+
+  <section class="card" id="trouble">
+    <h2>困ったとき</h2>
+    <details open>
+      <summary>実行ボタンを押しても進まない</summary>
+      <div>通信環境を確認し、ページを再読み込みしてください。長期間を指定している場合は、まず3日程度へ短くして試します。</div>
+    </details>
+    <details>
+      <summary>開催場が表示されない</summary>
+      <div>区分と期間を先に設定してください。開催のない日だけを指定すると、対象場が出ない場合があります。</div>
+    </details>
+    <details>
+      <summary>結果が0件になる</summary>
+      <div>未確定レースは期間横断精算の対象外です。過去の確定済み開催日を指定してください。また、予想条件が厳しい場合は購入対象が0Rになることがあります。</div>
+    </details>
+    <details>
+      <summary>予算が余っているのに購入数が少ない</summary>
+      <div>日次上限は「必ず使い切る金額」ではありません。旨み条件を通過した3点セットだけを採用するため、条件未達のレースは予算が残っていても見送ります。</div>
+    </details>
+    <details>
+      <summary>1年分を一度に調べたい</summary>
+      <div>高速モードをONにし、途中でJSON保存を行いながら進めてください。スマホでは数か月ごとに分けて検証する方が安定します。</div>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>最後に確認するチェックリスト</h2>
+    <p>□ JRA／NARを正しく選んだ</p>
+    <p>□ 開始日と終了日が正しい</p>
+    <p>□ 開催場の選択方法を確認した</p>
+    <p>□ 1日の購入上限と1点額を確認した</p>
+    <p>□ 短い期間で試してから長期間へ広げた</p>
+    <p>□ 全期間トータルの投資・払戻・ROIを確認した</p>
+  </section>
+
+  <div class="sticky">
+    <a href="#step1">最初から見る</a>
+    <a href="#step5">実行手順へ</a>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-inner">
+    <p><strong>期間横断シミュレーション ウィザード操作マニュアル</strong></p>
+    <p class="small">対象：The競馬 EV分析 スマホ版</p>
+    <p class="small">本機能は検証用です。実際の投票・購入を自動実行するものではありません。</p>
+  </div>
+</footer>
+</body>
+</html>
