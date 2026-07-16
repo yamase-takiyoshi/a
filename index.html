@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>The競馬 EV分析 v5.18.305 NarHistoryDbOdds</title>
+<title>The競馬 EV分析 v5.18.307 Index281CompatUI</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
@@ -652,6 +652,51 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
 .hr-replay-mode.show{display:block}
 @media(max-width:560px){.hr-replay-nav{grid-template-columns:1fr}.hr-replay-kpi{grid-template-columns:1fr 1fr}.hr-replay-ticket{grid-template-columns:auto 1fr}.hr-replay-ticket .money{grid-column:1/-1;text-align:left;padding-left:4px}}
 
+
+
+/* ============================================================
+   v5.18.307 Index281CompatUI / 互換設定を必ず見つけられる表示
+   ============================================================ */
+.compat281-header-btn{
+  appearance:none;cursor:pointer;font:800 10px/1.2 inherit;
+  padding:4px 9px;white-space:nowrap;transition:transform .15s ease,box-shadow .15s ease;
+}
+.compat281-header-btn:active{transform:scale(.96)}
+.compat281-header-btn:focus-visible{outline:2px solid #86efac;outline-offset:2px}
+.compat281-settings-card{
+  position:relative;overflow:hidden;
+  border:2px solid rgba(0,255,136,.58)!important;
+  background:linear-gradient(135deg,rgba(0,255,136,.12),rgba(15,23,42,.90))!important;
+  box-shadow:0 0 0 1px rgba(0,255,136,.12) inset,0 0 28px rgba(0,255,136,.13),0 18px 45px rgba(0,0,0,.22)!important;
+}
+.compat281-settings-card:before{
+  content:"";position:absolute;left:0;top:0;bottom:0;width:5px;
+  background:linear-gradient(180deg,#d9ffe8,#00e676,#008f4c);
+  box-shadow:0 0 18px rgba(0,255,136,.7);
+}
+.compat281-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px;padding-left:4px}
+.compat281-card-head h2{margin:1px 0 0;color:#d9ffe8;font-size:14px;text-transform:none;letter-spacing:0}
+.compat281-kicker{font-size:10px;color:#86efac;font-weight:900;letter-spacing:.08em}
+.compat281-state-pill{display:inline-flex;align-items:center;justify-content:center;min-width:52px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:950;border:1px solid}
+.compat281-state-pill.on{color:#052e16;background:#86efac;border-color:#bbf7d0;box-shadow:0 0 14px rgba(0,255,136,.28)}
+.compat281-state-pill.off{color:#422006;background:#fde68a;border-color:#fef3c7;box-shadow:0 0 14px rgba(251,191,36,.22)}
+.compat281-toggle-row{gap:14px;padding:11px 4px 11px 8px;border-top:1px solid rgba(0,255,136,.18);border-bottom:1px solid rgba(0,255,136,.18)!important}
+.compat281-toggle-row label{display:flex;flex-direction:column;gap:3px;cursor:pointer;color:#eafff4}
+.compat281-toggle-row label b{font-size:13px}
+.compat281-toggle-row label span{font-size:10px;color:#a7f3d0;line-height:1.45}
+.compat281-toggle-row input[type=checkbox]{width:28px;height:28px;accent-color:#00e676;cursor:pointer;flex:none}
+.compat281-status{margin-top:9px!important;padding:8px 10px;border-radius:9px;border:1px solid rgba(0,255,136,.20);background:rgba(0,0,0,.14);font-size:11px!important;line-height:1.7!important;color:#d1fae5}
+.compat281-caution{margin-top:8px;font-size:10px;line-height:1.6;color:#fde68a}
+.compat281-settings-card.compat281-flash{animation:compat281Flash 1.25s ease}
+@keyframes compat281Flash{
+  0%,100%{transform:translateZ(0);box-shadow:0 0 0 1px rgba(0,255,136,.12) inset,0 0 28px rgba(0,255,136,.13),0 18px 45px rgba(0,0,0,.22)}
+  35%{transform:translateY(-2px);box-shadow:0 0 0 3px rgba(0,255,136,.38) inset,0 0 42px rgba(0,255,136,.34),0 18px 45px rgba(0,0,0,.28)}
+}
+@media(max-width:560px){
+  .compat281-header-btn{font-size:9px;padding:4px 7px}
+  .compat281-card-head h2{font-size:13px}
+}
+
 </style>
 </head>
 <body>
@@ -662,7 +707,8 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   </div>
   <div style="display:flex;gap:8px;align-items:center">
     <button id="profitSplitBtn" class="btn-sm profit-split-toggle" type="button" onclick="toggleProfitLiveSplit()" aria-pressed="false">📊 横2画面</button>
-    <span class="ver">v5.18.305 NarHistoryDbOdds</span>
+    <span class="ver">v5.18.307 Index281CompatUI</span>
+    <button id="compat281Badge" class="nar-badge compat281-header-btn" type="button" onclick="openIndex281CompatSettings()" aria-label="index280からindex281への互換設定を開く" title="タップして互換設定を開く" style="border-color:rgba(0,255,136,.55);color:#86efac;background:rgba(0,255,136,.10)">🔁 281互換 ON</button>
     <span id="narBadge" class="nar-badge" style="display:none">NAR</span>
   </div>
 </div>
@@ -880,7 +926,7 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
         </div>
         <div style="font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5">
           ※チェックした場だけを対象にします。1つもチェックしなければ、各日に実際に開催されている全場を自動対象にします。<br>
-          ※NARは過去日も地方競馬公式の開催一覧からrace_idを生成します。32日以上は通常ボタンから実行しても一発モードへ自動切替し、日程探索を4並列で進めます。<br>
+          ※281互換ONでは、長期間NARも281と同じ1レースずつの順次処理で実行します。互換OFFの公式検証モードだけ、32日以上を一発モードへ自動切替します。<br>
           ※2026年2月以前の確定単勝オッズは公式側に残っていないため、住宅IPブリッジでdb.netkeibaを自動補完します。画面上部の🌉表示が必要です。<br>
           ※1年分は対象レース数が多いため完了まで時間がかかります。中断後は「続きから再開」を利用できます。
         </div>
@@ -1759,6 +1805,27 @@ body.profit-split-active #profitLivePane{display:flex;position:fixed;right:0;top
   <!-- 設定タブ -->
   <div id="tab-settings" style="display:none">
 
+    <div class="card compat281-settings-card" id="index281CompatSettingsCard">
+      <div class="compat281-card-head">
+        <div>
+          <div class="compat281-kicker">設定画面の最上段</div>
+          <h2>🔁 index280 → index281 互換設定</h2>
+        </div>
+        <span id="index281CompatStatePill" class="compat281-state-pill on">ON</span>
+      </div>
+      <div class="settings-row compat281-toggle-row">
+        <label for="setIndex281Compat">
+          <b>281と同じ内部処理を使う</b>
+          <span>280の処理結果を281方式へ合わせる主スイッチです。</span>
+        </label>
+        <input type="checkbox" id="setIndex281Compat" checked onchange="handleIndex281CompatChange(this.checked)" aria-describedby="index281CompatStatus">
+      </div>
+      <div id="index281CompatStatus" class="proxy-note compat281-status">
+        ON：281と同じ順次処理・従来NAR取得経路を使用します。
+      </div>
+      <div class="compat281-caution">通常は <b>ONのまま</b> 使用してください。OFFは280側の公式検証経路との比較専用です。</div>
+    </div>
+
     <div class="card">
       <h2>モード選択</h2>
       <div class="mode-grid" id="modeGrid"></div>
@@ -2178,6 +2245,7 @@ const CHIP_CLASS = {
 };
 
 let settings = {
+  index281Compat: true,
   mode: 'roi100',
   allAgreeModes: ['roi100','roi120','ev_roi'],
   nar: false,
@@ -2199,6 +2267,103 @@ let settings = {
   minEVByType: {...DEFAULT_MIN_EV},
   proxyUrl: 'https://takuya.nitta-katsuhiko.workers.dev/'
 };
+
+function isIndex281CompatEnabled(){
+  try{ return !settings || settings.index281Compat !== false; }catch(e){ return true; }
+}
+window.isIndex281CompatEnabled = isIndex281CompatEnabled;
+
+function index281SettingsFingerprint(){
+  try{
+    const visible = {
+      mode:settings.mode, allAgreeModes:settings.allAgreeModes, nar:settings.nar,
+      budget:settings.budget, unit:settings.unit, maxTickets:settings.maxTickets,
+      antigami:settings.antigami, useWakuren:settings.useWakuren,
+      useSanren:settings.useSanren, useWideUmaren:settings.useWideUmaren,
+      nagoyaMode:settings.nagoyaMode, disabledTypeAction:settings.disabledTypeAction,
+      dailyLimit:settings.dailyLimit, dailyPointAmount:settings.dailyPointAmount,
+      allocationMode:settings.allocationMode, dailyRankMetric:settings.dailyRankMetric,
+      narTransitionAdj:settings.narTransitionAdj, narTransitionLearn:settings.narTransitionLearn,
+      minEVByType:settings.minEVByType
+    };
+    const guard = localStorage.getItem('tk-sweep-purchase-guard-v1') || '';
+    const learning = localStorage.getItem('tk-nar-transition-learning-v2') || '';
+    const text = JSON.stringify(visible) + '|' + guard + '|' + learning;
+    let h = 2166136261;
+    for(let i=0;i<text.length;i++){
+      h ^= text.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return ('00000000' + (h >>> 0).toString(16)).slice(-8).toUpperCase();
+  }catch(e){ return '--------'; }
+}
+window.index281SettingsFingerprint = index281SettingsFingerprint;
+
+function updateIndex281CompatUI(){
+  const on = isIndex281CompatEnabled();
+  const fp = index281SettingsFingerprint();
+  const badge = document.getElementById('compat281Badge');
+  if(badge){
+    badge.textContent = on ? '🔁 281互換 ON' : '⚠️ 公式検証 OFF';
+    badge.style.color = on ? '#86efac' : '#fde68a';
+    badge.style.borderColor = on ? 'rgba(0,255,136,.55)' : 'rgba(251,191,36,.55)';
+    badge.style.background = on ? 'rgba(0,255,136,.10)' : 'rgba(251,191,36,.10)';
+  }
+  const cb = document.getElementById('setIndex281Compat');
+  if(cb) cb.checked = on;
+  const pill = document.getElementById('index281CompatStatePill');
+  if(pill){
+    pill.textContent = on ? 'ON' : 'OFF';
+    pill.classList.toggle('on', on);
+    pill.classList.toggle('off', !on);
+  }
+  const st = document.getElementById('index281CompatStatus');
+  if(st){
+    st.innerHTML = on
+      ? '<b>✅ 281互換 ON</b>：280を281と同じ順次処理・従来NAR取得経路で実行します。長期間でも一発モードへ自動切替しません。<br>設定・学習指紋：<b>'+fp+'</b>'
+      : '<b>公式検証モード</b>：280のNAR公式・過去確定オッズ経路を使用します。281互換集計とは結果が異なる場合があります。<br>設定・学習指紋：<b>'+fp+'</b>';
+    st.style.color = on ? '#d1fae5' : '#fde68a';
+  }
+  const narMode = document.getElementById('narGoMode');
+  if(narMode){
+    narMode.disabled = on;
+    narMode.title = on ? '281互換ONでは従来netkeiba経路へ固定されます' : '';
+  }
+}
+window.updateIndex281CompatUI = updateIndex281CompatUI;
+
+function handleIndex281CompatChange(on){
+  try{
+    settings.index281Compat = !!on;
+    localStorage.setItem('tk-html-settings', JSON.stringify(settings));
+  }catch(e){}
+  try{ saveSettings(); }catch(e){ updateIndex281CompatUI(); }
+  const card = document.getElementById('index281CompatSettingsCard');
+  if(card){
+    card.classList.remove('compat281-flash');
+    void card.offsetWidth;
+    card.classList.add('compat281-flash');
+    setTimeout(()=>card.classList.remove('compat281-flash'), 1400);
+  }
+}
+window.handleIndex281CompatChange = handleIndex281CompatChange;
+
+function openIndex281CompatSettings(){
+  try{
+    const tab = document.querySelector('.tab-btn[data-tab="settings"]');
+    if(tab) tab.click();
+    setTimeout(function(){
+      const card = document.getElementById('index281CompatSettingsCard');
+      if(!card) return;
+      card.scrollIntoView({behavior:'smooth', block:'start'});
+      card.classList.remove('compat281-flash');
+      void card.offsetWidth;
+      card.classList.add('compat281-flash');
+      setTimeout(()=>card.classList.remove('compat281-flash'), 1400);
+    }, 80);
+  }catch(e){}
+}
+window.openIndex281CompatSettings = openIndex281CompatSettings;
 
 let horses = [];
 let lastRecs = [];
@@ -2368,6 +2533,7 @@ function loadSettings(){
   try {
     loaded = JSON.parse(localStorage.getItem('tk-html-settings') || '{}') || {};
     Object.assign(settings, loaded);
+    settings.index281Compat = loaded.index281Compat !== false;
     if(!settings.proxyUrl) settings.proxyUrl = 'https://takuya.nitta-katsuhiko.workers.dev/';
     if(!settings.minEVByType) settings.minEVByType = {...DEFAULT_MIN_EV};
     TICKET_TYPES.forEach(t => { if(!settings.minEVByType[t]) settings.minEVByType[t] = DEFAULT_MIN_EV[t]; });
@@ -2386,6 +2552,7 @@ function loadSettings(){
   } catch(e) { profitHistory = []; }
 }
 function saveSettings(){
+  settings.index281Compat = document.getElementById('setIndex281Compat')?.checked !== false;
   settings.nar = document.getElementById('setNar')?.value === '1';
   settings.budget = Number(document.getElementById('setBudget')?.value || 500);
   settings.unit = Number(document.getElementById('setUnit')?.value || 100);
@@ -2413,6 +2580,7 @@ function saveSettings(){
   updateDailyBudgetSettingsUI();
   updateNarTransitionSettingsUI();
   syncDailyBudgetGuardStorage();
+  updateIndex281CompatUI();
 }
 function saveProxy(){
   settings.proxyUrl = document.getElementById('proxyUrl')?.value?.trim() || '';
@@ -3274,6 +3442,7 @@ function applyStateSnapshot(data){
 }
 
 function refreshSettingsUI(){
+  updateIndex281CompatUI();
   const setNar = document.getElementById('setNar'); if(setNar) setNar.value = settings.nar ? '1' : '0';
   const setBudget = document.getElementById('setBudget'); if(setBudget) setBudget.value = settings.budget;
   const setUnit = document.getElementById('setUnit'); if(setUnit) setUnit.value = settings.unit;
@@ -3310,6 +3479,7 @@ function resetSettingsToDefault(){
   if(!confirm('各種設定を初期値に戻します（プロキシURLは保持）。よろしいですか？')) return;
   const keepProxy = settings.proxyUrl;
   settings = {
+    index281Compat: true,
     mode: 'roi100',
     allAgreeModes: ['roi100','roi120','ev_roi'],
     nar: false,
@@ -3370,6 +3540,7 @@ function initUI(){
   });
 
   // 設定パネル
+  updateIndex281CompatUI();
   document.getElementById('setNar').value = settings.nar ? '1' : '0';
   document.getElementById('setBudget').value = settings.budget;
   document.getElementById('setUnit').value = settings.unit;
@@ -5705,10 +5876,15 @@ function parsePayoutsFromResultDoc(doc){
     if(!amounts.length) return;
     let combos = [];
     if(type === '単勝' || type === '複勝'){
-      const nums = [...block.matchAll(/(?:^|[^0-9])(1[0-8]|[1-9])(?:[^0-9]|$)/g)].map(m=>Number(m[1]));
+      const nums = isIndex281CompatEnabled()
+        ? [...block.matchAll(/(?:^|[^0-9])([1-9]|1[0-8])(?:[^0-9]|$)/g)].map(m=>Number(m[1]))
+        : [...block.matchAll(/(?:^|[^0-9])(1[0-8]|[1-9])(?:[^0-9]|$)/g)].map(m=>Number(m[1]));
       combos = [...new Set(nums)].slice(0, amounts.length).map(n=>[n]);
     }else{
-      [...block.matchAll(/(?:^|[^0-9])(1[0-8]|[1-9])\s*-\s*(1[0-8]|[1-9])(?:\s*-\s*(1[0-8]|[1-9]))?(?=[^0-9]|$)/g)].forEach(m=>{
+      const comboMatches = isIndex281CompatEnabled()
+        ? block.matchAll(/([1-9]|1[0-8])\s*-\s*([1-9]|1[0-8])(?:\s*-\s*([1-9]|1[0-8]))?/g)
+        : block.matchAll(/(?:^|[^0-9])(1[0-8]|[1-9])\s*-\s*(1[0-8]|[1-9])(?:\s*-\s*(1[0-8]|[1-9]))?(?=[^0-9]|$)/g);
+      [...comboMatches].forEach(m=>{
         const a=[Number(m[1]),Number(m[2])];
         if(m[3]) a.push(Number(m[3]));
         combos.push(a);
@@ -7630,6 +7806,14 @@ function initCalendarPicker(){
 function buildNetkeibaOddsUrls(kind, raceId){
   if(!raceId) return [];
   if(kind === 'NAR'){
+    if(isIndex281CompatEnabled()){
+      return [
+        `https://nar.netkeiba.com/race/result.html?race_id=${raceId}&rf=race_submenu`,
+        `https://nar.netkeiba.com/odds/index.html?race_id=${raceId}`,
+        `https://nar.netkeiba.com/odds/index.html?race_id=${raceId}&type=b1`,
+        `https://nar.netkeiba.com/race/shutuba.html?race_id=${raceId}&rf=race_submenu`
+      ];
+    }
     return [
       // v5.18.47: 確定済みレースは結果ページの最終単勝オッズ・人気を最優先。
       `https://nar.netkeiba.com/race/result.html?race_id=${raceId}&rf=race_submenu`,
@@ -8590,7 +8774,73 @@ function parseOddsByNameFromOddsDoc(doc){
 }
 
 
+// index281互換: v5.18.297と同じ「最初に2件以上取得できた経路を採用」する。
+async function fetchWinOddsPopularity281(kind, raceId, expectedHorses){
+  if(!settings.proxyUrl || !raceId) return new Map();
+  const dbgEl = document.getElementById('urlStatus');
+  const dbgLog = [];
+  function dbgAppend(msg){
+    dbgLog.push(msg);
+    if(dbgEl) dbgEl.innerHTML = `<div class="url-status" style="font-size:11px;line-height:1.8">${dbgLog.map(l=>escapeHtml(l)).join('<br>')}</div>`;
+  }
+  dbgAppend(`🔍 281互換オッズ取得開始: ${raceId}`);
+
+  for(const url of buildNetkeibaOddsUrls(kind, raceId)){
+    const shortUrl = url.replace('https://race.netkeiba.com','').replace('https://nar.netkeiba.com','');
+    try{
+      const html = await fetchHtmlViaProxy(url);
+      if(!html){ dbgAppend(`⬜ 空レスポンス: ${shortUrl}`); continue; }
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      let map = url.includes('result.html')
+        ? parseFinalOddsPopularityFromResultDoc(doc, expectedHorses)
+        : parseWinOddsPopularityFromDoc(doc);
+
+      if(!url.includes('result.html') && Array.isArray(expectedHorses) && expectedHorses.length){
+        const byName2 = parseOddsByNameFromOddsDoc(doc);
+        if(byName2.size >= 2){
+          const nameKeyed = new Map();
+          expectedHorses.forEach(h => {
+            const nm = normalizeNameForJoin(h && h.name);
+            const num = Number(h && h.num);
+            if(nm && byName2.has(nm) && num >= 1) nameKeyed.set(num, { odds: byName2.get(nm), pop: 0 });
+          });
+          if(nameKeyed.size >= 2){
+            map = (nameKeyed.size >= expectedHorses.length - 1)
+              ? nameKeyed
+              : mergeOddsMaps(nameKeyed, map);
+          }
+        }
+      }
+
+      if(url.includes('result.html')){
+        dbgAppend(`📄 result.html → ${map.size}件取得`);
+        if(map.size >= 2) return map;
+      }
+
+      const anyMap = parseWinOddsPopularityFromAnyOddsHtml(html, expectedHorses);
+      map = mergeOddsMaps(map, anyMap);
+      if((!map || map.size < 2) && kind === 'JRA' && Array.isArray(expectedHorses) && expectedHorses.length){
+        const byName = parseWinOddsPopularityByHorseNamesFromHtml(html, expectedHorses);
+        map = mergeOddsMaps(map, byName);
+      }
+      if((!map || map.size < 2) && url.includes('shutuba.html')){
+        const sMap = parseWinOddsPopularityFromShutuba(doc);
+        map = mergeOddsMaps(map, sMap);
+      }
+      dbgAppend(`${map.size >= 2 ? '✅' : '❌'} ${shortUrl} → ${map.size}件`);
+      if(map.size >= 2) return map;
+    }catch(e){
+      dbgAppend(`💥 エラー: ${shortUrl} → ${e.message || e}`);
+      console.warn('281 compatible odds fetch failed:', e);
+    }
+  }
+  dbgAppend('⚠️ オッズ取得失敗（281互換の全URL試行済み）');
+  return new Map();
+}
+
+
 async function fetchWinOddsPopularity(kind, raceId, expectedHorses){
+  if(isIndex281CompatEnabled()) return await fetchWinOddsPopularity281(kind, raceId, expectedHorses);
   if(!settings.proxyUrl || !raceId) return new Map();
   // v5.18.58 Debug: ステータス欄にオッズ取得ログを表示
   const dbgEl = document.getElementById('urlStatus');
@@ -8926,7 +9176,7 @@ async function fetchRace(){
     // v5.18.298: 発走前でも result.html は出走馬HTMLを返すことがある。
     // URLだけで最終結果扱いせず、1着・2着が実在しない result.html は
     // 同じrace_idの出馬表へ戻して発売中オッズの取得経路を使う。
-    if(/\/race\/result\.html/i.test(activeUrl) && !isRaceResultConfirmedDoc(doc)){
+    if(!isIndex281CompatEnabled() && /\/race\/result\.html/i.test(activeUrl) && !isRaceResultConfirmedDoc(doc)){
       const liveRid = (activeUrl.match(/race_id=(\d{10,14})/) || [])[1] || validation.raceId || '';
       const liveKind = document.getElementById('pickKind')?.value || (activeUrl.includes('nar.netkeiba') ? 'NAR' : 'JRA');
       const liveHost = liveKind === 'NAR' ? 'https://nar.netkeiba.com' : 'https://race.netkeiba.com';
@@ -8962,7 +9212,7 @@ async function fetchRace(){
         const resultDoc = parser.parseFromString(resultHtml, 'text/html');
         const resultHorsesProbe = parseHorsesFromDoc(resultDoc, resultUrl);
         const resultOddsProbe = parseFinalOddsPopularityFromResultDoc(resultDoc, resultHorsesProbe);
-        if(isRaceResultConfirmedDoc(resultDoc) && resultHorsesProbe.length >= 2 && resultOddsProbe.size >= 2){
+        if((isIndex281CompatEnabled() || isRaceResultConfirmedDoc(resultDoc)) && resultHorsesProbe.length >= 2 && resultOddsProbe.size >= 2){
           activeUrl = resultUrl;
           html = resultHtml;
           doc = resultDoc;
@@ -9038,7 +9288,8 @@ async function fetchRace(){
     // NAR側の挙動はそのまま維持し、一切変更しない。
     const kind = document.getElementById('pickKind')?.value || (activeUrl.includes('nar.netkeiba') ? 'NAR' : 'JRA');
     // result.htmlというURLだけでは確定扱いにしない。実着順1・2着が取れた場合だけ最終値を採用する。
-    const isResultPage = /\/race\/result\.html/i.test(activeUrl) && isRaceResultConfirmedDoc(doc);
+    const isResultPage = /\/race\/result\.html/i.test(activeUrl) &&
+      (isIndex281CompatEnabled() || isRaceResultConfirmedDoc(doc));
 
     if(rid){
       if(kind === 'JRA'){
@@ -9308,7 +9559,8 @@ function findPopularityIndexByRightScan(tr, horseNo){
   // ここでは意味が明示されていない整数を絶対に人気へ流用しない。
   for(let i=cells.length-1; i>=0; i--){
     const tx = cells[i];
-    const m = tx.match(/^(\d{1,2})\s*人気$/);
+    const m = tx.match(/^(\d{1,2})\s*人気$/) ||
+      (isIndex281CompatEnabled() ? tx.match(/^(\d{1,2})$/) : null);
     if(!m) continue;
     const v = Number(m[1]);
     if(v >= 1 && v <= 18 && v !== Number(horseNo)){
@@ -9627,7 +9879,7 @@ function parseHorsesFromDoc(doc, url){
     // 結果未確定時の枠番・着順・馬番誤読を防ぎ、確定値は後段の
     // parseFinalOddsPopularityFromResultDoc() / oddsページだけから馬番JOINする。
     let odds, pop;
-    if(isJraShutubaUrl || isResultUrl){
+    if(isJraShutubaUrl || (isResultUrl && !isIndex281CompatEnabled())){
       odds = 0;
       pop  = 0;
     }else{
@@ -12880,7 +13132,8 @@ if(horses.length === 0){
       html = await fetchHtmlViaProxy(activeUrl);
     }
     let doc = parser.parseFromString(html, 'text/html');
-    let isResultPage = /\/race\/result\.html/i.test(activeUrl) && isRaceResultConfirmedDoc(doc);
+    let isResultPage = /\/race\/result\.html/i.test(activeUrl) &&
+      (isIndex281CompatEnabled() || isRaceResultConfirmedDoc(doc));
     let resultDoc = isResultPage ? doc : null;
 
     // 出馬表のままでも確定済みなら結果ページの最終値を本体にする（fetchRace と同じ判断）
@@ -12891,7 +13144,7 @@ if(horses.length === 0){
         const rDoc = parser.parseFromString(rHtml, 'text/html');
         const rHorses = parseHorsesFromDoc(rDoc, rUrl);
         const rOdds = parseFinalOddsPopularityFromResultDoc(rDoc, rHorses);
-        const rConfirmed = isRaceResultConfirmedDoc(rDoc);
+        const rConfirmed = isIndex281CompatEnabled() || isRaceResultConfirmedDoc(rDoc);
         if(rConfirmed) resultDoc = rDoc; // 確定結果だけを精算で使い回す
         if(rConfirmed && rHorses.length >= 2 && rOdds.size >= 2){
           activeUrl = rUrl; html = rHtml; doc = rDoc; isResultPage = true;
@@ -12958,7 +13211,7 @@ if(horses.length === 0){
       const url = `${host}/race/result.html?race_id=${rid}&rf=race_submenu`;
       const html = await fetchHtmlViaProxy(url);
       const doc = new DOMParser().parseFromString(html, 'text/html');
-      if(!isRaceResultConfirmedDoc(doc)) throw new Error('result page is not confirmed');
+      if(!isIndex281CompatEnabled() && !isRaceResultConfirmedDoc(doc)) throw new Error('result page is not confirmed');
       let hs = parseHorsesFromDoc(doc, url);
       if(!hs || hs.length < 2) throw new Error('result page horses not enough');
       const raceName = parseRaceTitleFromDoc(doc) || '';
@@ -13356,6 +13609,7 @@ if(horses.length === 0){
     }catch(e){ return false; }
   }
   async function rsEnsureNarHistoricalOddsAccess(kind, dates, prog){
+    if(isIndex281CompatEnabled()) return true;
     if(kind !== 'NAR' || !(dates || []).some(d => String(d) < RS_NAR_OFFICIAL_ODDS_FROM)) return true;
     if(!rsNarBridgeReadyForHistory()){
       // Userscriptのdirect注入が僅かに遅れた場合だけ短く待つ。未導入時に17秒待たせない。
@@ -13583,7 +13837,7 @@ if(horses.length === 0){
   async function rsCollectRaces(kind, date, venueCode){
     // v5.18.302: NAR期間横断ではTodayRaceInfo上書き済みloadRaceListを呼ばない。
     // 過去日はrace_id、当日以降はnetkeiba一覧を直接使うため、UIのselectも汚さない。
-    if(kind === 'NAR') return await rsCollectNarRacesDirect(date, venueCode);
+    if(kind === 'NAR' && !isIndex281CompatEnabled()) return await rsCollectNarRacesDirect(date, venueCode);
 
     const kEl = $('pickKind'), dEl = $('pickDate'), vEl = $('pickVenue');
     if(kEl) kEl.value = kind;
@@ -14378,7 +14632,7 @@ if(horses.length === 0){
     // v5.18.304: 購入ガード・バックテストも通常実行と同じ一発経路へ統一する。
     // 旧経路では日付ヘッダーだけを作って実レースを収集できず、R=0の行が
     // 並ぶことがあった。長期間の通常実行も従来どおり一発モードへ切り替える。
-    if(purchaseGuardRun || (kind === 'NAR' && dates.length > 31)){
+    if(!isIndex281CompatEnabled() && (purchaseGuardRun || (kind === 'NAR' && dates.length > 31))){
       if(prog) prog.innerHTML = `<div class="url-status">🚄 ${purchaseGuardRun ? 'バックテスト' : dates.length+'日間の'+kind}を検出。race_id日程探索＋一発モードへ自動切替します...</div>`;
       await new Promise(resolve => setTimeout(resolve, 0));
       return await runRangeVenueSimulationOneShot(Object.assign({}, opts || {}, { autoLongRange:true }));
@@ -14906,6 +15160,12 @@ if(horses.length === 0){
     return row;
   }
   async function runRangeVenueSimulationOneShot(opts){
+    if(isIndex281CompatEnabled()){
+      const prog281 = $('rsProgress');
+      if(prog281) prog281.innerHTML = '<div class="url-status">🔁 281互換ON：一発ボタンも281と同じ順次処理で実行します...</div>';
+      await new Promise(resolve => setTimeout(resolve, 0));
+      return await runRangeVenueSimulation(Object.assign({}, opts || {}, { index281CompatForward:true }));
+    }
     const btn = $('rsOneShotBtn'), stopBtn = $('rsStopBtn'), prog = $('rsProgress');
     const kind = $('rsKind')?.value || 'JRA';
     const start = $('rsStart')?.value || '';
@@ -23566,7 +23826,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
    ============================================================ */
 (function(){
   'use strict';
-  var VERSION = 'v5.18.305 NarHistoryDbOdds';
+  var VERSION = 'v5.18.307 Index281CompatUI';
   var KEY = 'tk-sim-reservations-v1';
   var IMMEDIATE_KEY = 'tk-sweep-immediate-all-v1';
   var GUARD_KEY = 'tk-sweep-purchase-guard-v1';
@@ -26228,7 +26488,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.305 NarHistoryDbOdds: 全て同意でも3点すべての旨み判定を維持 */
+/* v5.18.307 Index281CompatUI: 全て同意でも3点すべての旨み判定を維持 */
 (function(){
   'use strict';
   function n(v){var x=Number(v);return Number.isFinite(x)?x:0}
@@ -26358,7 +26618,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.287 BatchSubmitAssist: 3点セット当日一括購入票＋公式投票サイト引き渡し */
 (function(){
   'use strict';
-  var VERSION='v5.18.305 NarHistoryDbOdds';
+  var VERSION='v5.18.307 Index281CompatUI';
   var RES_KEY='tk-sim-reservations-v1';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var PREF_KEY='tk-daily-batch-provider-v1';
@@ -26533,7 +26793,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 /* v5.18.256 RangeSyncFix: 横2画面リアルタイム連動 */
 (function(){
   'use strict';
-  var V='v5.18.305 NarHistoryDbOdds';
+  var V='v5.18.307 Index281CompatUI';
   function applyVersion(){
     window.APP_VERSION=V;
     var el=document.querySelector('.header .ver, .ver');
@@ -27349,10 +27609,10 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.305 NarHistoryDbOdds: 最終通信・買い目・比較表示経路を固定 */
+/* v5.18.307 Index281CompatUI: 最終通信・買い目・比較表示経路を固定 */
 (function(){
   'use strict';
-  var VERSION='v5.18.305 NarHistoryDbOdds';
+  var VERSION='v5.18.307 Index281CompatUI';
   function ridFromUrl(url){
     var s=String(url||'');
     if(!/^https:\/\/nar(?:\.sp)?\.netkeiba\.com\//i.test(s))return '';
@@ -27418,12 +27678,12 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 </script>
 
 <script>
-/* v5.18.305 NarHistoryDbOdds: 全て同意は旨み条件を保ったユーザー強制優先層 */
+/* v5.18.307 Index281CompatUI: 全て同意は旨み条件を保ったユーザー強制優先層 */
 (function(){
   'use strict';
   var MODE_KEY='all_agree';
   var MODE_LABEL='🤝 全て同意（ユーザー強制優先）';
-  var VERSION='v5.18.305 NarHistoryDbOdds';
+  var VERSION='v5.18.307 Index281CompatUI';
   var SETTINGS_KEY='tk-html-settings';
   var GUARD_KEY='tk-sweep-purchase-guard-v1';
   var DEFAULT_BASE_MODE='roi100';
@@ -27683,7 +27943,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
 // ============================================================
 (function(){
   'use strict';
-  const V274 = 'v5.18.305 NarHistoryDbOdds';
+  const V274 = 'v5.18.307 Index281CompatUI';
   const LS_MODE = 'narGoMode_v1';
   const TTL_MS = 30000;
   const OFFICIAL_ODDS_FROM274 = '20260301';
@@ -27711,6 +27971,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
   // official : NARなら常に公式を先に試す
   // off      : 従来どおり netkeiba のみ（この機能を無効化）
   function mode274(){
+    if(isIndex281CompatEnabled()) return 'off';
     try{ return localStorage.getItem(LS_MODE) || 'auto'; }catch(e){ return 'auto'; }
   }
   function setMode274(m){
@@ -28395,6 +28656,7 @@ function json(obj,status=200){ return new Response(JSON.stringify(obj,null,2), {
     host.appendChild(card);
     const sel = document.getElementById('narGoMode');
     if(sel) sel.value = mode274();
+    try{ updateIndex281CompatUI(); }catch(e){}
   }
 
   window.narGoSetMode = function(m){
